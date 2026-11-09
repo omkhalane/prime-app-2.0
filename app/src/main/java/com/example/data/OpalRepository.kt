@@ -970,10 +970,45 @@ class OpalRepository(private val context: Context? = null) {
         return (measuredMillis.coerceAtLeast(0L) / 60_000L).toInt()
     }
 
-    fun addFocusMinutes(minutes: Int) {
+    fun addFocusMinutes(minutes: Int, isPomodoro: Boolean = false) {
         if (minutes <= 0) return
-        val current = prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0
-        prefs?.edit()?.putInt("verified_focus_min_${getTodayDateKey()}", current + minutes)?.apply()
+        val dateKey = getTodayDateKey()
+        val currentMinutes = prefs?.getInt("verified_focus_min_$dateKey", 0) ?: 0
+        val currentSessions = prefs?.getInt("verified_focus_sessions_$dateKey", 0) ?: 0
+        val editor = prefs?.edit()
+            ?.putInt("verified_focus_min_$dateKey", currentMinutes + minutes)
+            ?.putInt("verified_focus_sessions_$dateKey", currentSessions + 1)
+
+        if (isPomodoro) {
+            val currentPomodoros = prefs?.getInt("verified_pomodoro_sessions_$dateKey", 0) ?: 0
+            val currentPomodoroMinutes = prefs?.getInt("verified_pomodoro_min_$dateKey", 0) ?: 0
+            editor?.putInt("verified_pomodoro_sessions_$dateKey", currentPomodoros + 1)
+                ?.putInt("verified_pomodoro_min_$dateKey", currentPomodoroMinutes + minutes)
+        }
+        editor?.apply()
+    }
+
+    fun getTodayFocusSessions(): Int =
+        (prefs?.getInt("verified_focus_sessions_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
+
+    fun getWeekFocusSessions(): Int {
+        val calendar = java.util.Calendar.getInstance().apply {
+            firstDayOfWeek = java.util.Calendar.SUNDAY
+            set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SUNDAY)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val today = java.util.Calendar.getInstance()
+        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        var total = 0
+        while (calendar.timeInMillis <= today.timeInMillis) {
+            val dateKey = formatter.format(calendar.time)
+            total += prefs?.getInt("verified_focus_sessions_$dateKey", 0) ?: 0
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        return total.coerceAtLeast(0)
     }
 
     // Blocking time is recorded by BlockingManager from actual enforcement uptime.
