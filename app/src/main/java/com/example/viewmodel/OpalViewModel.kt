@@ -185,6 +185,7 @@ class OpalViewModel(
             timerRemainingSeconds = repository.getSavedStandardTimerState().first,
             timerSelectedMinutes = repository.getSavedStandardTimerState().second,
             isTimerRunning = repository.getSavedStandardTimerState().third,
+            isTimerPaused = repository.getSavedStandardTimerPaused(),
             stopwatchState = run { val saved = repository.getSavedStopwatchState(); StopwatchState(isRunning = saved.second, elapsedMillis = saved.first, laps = repository.stopwatchLapsFlow.value) },
             pomodoroSettings = repository.pomodoroSettingsFlow.value,
             pomodoroState = repository.pomodoroStateFlow.value,
@@ -244,6 +245,9 @@ class OpalViewModel(
         }
         if (_uiState.value.isTimerRunning) {
             startRecoveredTimerLoop()
+        }
+        if (_uiState.value.pomodoroState.isRunning && !_uiState.value.pomodoroState.isPaused) {
+            launchPomodoroLoop()
         }
         if (_uiState.value.stopwatchState.isRunning) {
             val saved = repository.getSavedStopwatchState()
