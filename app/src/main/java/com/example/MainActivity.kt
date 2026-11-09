@@ -613,7 +613,9 @@ fun OpalApp() {
                         onAddNewAlarm = { viewModel.openCreateAlarm() },
                         onEditAlarm = { viewModel.openEditAlarm(it) },
                         onToggleAlarm = { id, enabled -> viewModel.toggleAlarm(id, enabled) },
-                        onDeleteAlarm = { viewModel.deleteAlarm(it) }
+                        onDeleteAlarm = { viewModel.deleteAlarm(it) },
+                        clockPreferences = uiState.clockPreferences,
+                        onSaveClockPreferences = { viewModel.saveClockPreferences(it) }
                     )
                 }
 
