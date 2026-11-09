@@ -157,6 +157,9 @@ class WellbeingRepository(private val context: Context) {
                     UsageEvents.Event.ACTIVITY_PAUSED -> {
                         if (previousForegroundPackage == pkg) previousForegroundPackage = null
                     }
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                        previousForegroundPackage = null
+                    }
                     USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
                         sawNotificationEvent = true
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
@@ -248,6 +251,9 @@ class WellbeingRepository(private val context: Context) {
                     }
                     UsageEvents.Event.ACTIVITY_PAUSED -> {
                         if (previousForegroundPackage == pkg) previousForegroundPackage = null
+                    }
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                        previousForegroundPackage = null
                     }
                     USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
                         sawNotificationEvent = true
@@ -562,6 +568,9 @@ class WellbeingRepository(private val context: Context) {
                             }
                             UsageEvents.Event.ACTIVITY_PAUSED -> {
                                 if (previousForegroundPackage == eventPackage) previousForegroundPackage = null
+                            }
+                            UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                                previousForegroundPackage = null
                             }
                             USAGE_EVENT_NOTIFICATION_INTERRUPTION -> if (eventPackage == packageName) {
                                 notificationCountAvailable = true
