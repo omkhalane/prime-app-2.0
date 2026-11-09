@@ -142,7 +142,6 @@ object RealScreenTimeTracker {
                     fetchError = "Unable to read Android usage statistics: ${e.message}"
                 }
 
-                }
             } else {
                 fetchError = "UsageStatsManager system service not available on device."
             }
