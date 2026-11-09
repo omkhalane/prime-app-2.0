@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Snooze
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -153,6 +155,8 @@ fun AlarmRingingScreen(
     modifier: Modifier = Modifier
 ) {
     var isChallengeActive by remember { mutableStateOf(false) }
+    var isSoundMuted by remember { mutableStateOf(false) }
+    val alarmContext = LocalContext.current
 
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -371,6 +375,33 @@ fun AlarmRingingScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF211A2D))
+                            .clickable {
+                                isSoundMuted = !isSoundMuted
+                                AlarmSoundManager.setMuted(alarmContext, isSoundMuted)
+                            }
+                            .padding(horizontal = 18.dp, vertical = 10.dp)
+                            .testTag("alarm_mute_button"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isSoundMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                            contentDescription = if (isSoundMuted) "Unmute alarm" else "Mute alarm",
+                            tint = Color(0xFFD1C4E9),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isSoundMuted) "Sound muted" else "Mute sound",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
