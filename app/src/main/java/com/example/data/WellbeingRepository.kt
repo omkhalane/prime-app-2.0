@@ -138,7 +138,7 @@ class WellbeingRepository(private val context: Context) {
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED, 1 ->
+                    UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
                     12 ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
@@ -591,7 +591,7 @@ class WellbeingRepository(private val context: Context) {
                 val timestamp = event.timeStamp.coerceIn(startTime, endTime)
                 val pkg = event.packageName
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED, 1, 4 -> {
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
                         if (pkg != null) {
                             closeActive(timestamp)
                             if (screenInteractive && !keyguardVisible && launchablePackages.contains(pkg) &&
@@ -602,7 +602,7 @@ class WellbeingRepository(private val context: Context) {
                             }
                         }
                     }
-                    UsageEvents.Event.ACTIVITY_PAUSED, 2 -> {
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
                         if (pkg != null && activePackage == pkg) closeActive(timestamp)
                     }
                     16, 17 -> {
