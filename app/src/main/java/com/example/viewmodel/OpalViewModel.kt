@@ -367,7 +367,6 @@ class OpalViewModel(
     }
 
     fun refreshRealScreenTime() {
-        repository.refreshRealScreenTime()
         refreshPermissions()
         refreshWellbeingData()
     }
