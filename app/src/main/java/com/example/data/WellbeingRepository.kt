@@ -176,6 +176,8 @@ class WellbeingRepository(private val context: Context) {
             emptySet()
         }
 
+        val launchablePackages = getLaunchablePackages()
+
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
 
