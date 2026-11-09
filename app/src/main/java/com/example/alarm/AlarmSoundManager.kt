@@ -124,7 +124,9 @@ object AlarmSoundManager {
                 }
                 return
             } catch (_: Throwable) {
-                // Fall back to synthetic tone if URI cannot be played
+                // Release a partially initialized player before falling back.
+                try { mediaPlayer?.release() } catch (_: Throwable) { }
+                mediaPlayer = null
             }
         }
 
