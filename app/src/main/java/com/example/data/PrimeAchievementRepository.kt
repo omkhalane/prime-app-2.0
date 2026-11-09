@@ -100,7 +100,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
             val customUnlockedDate = unlockedMap[badge.id]
             if (customUnlockedDate != null) {
                 badge.copy(
-                    isUnlocked = false,
+                    isUnlocked = true,
                     unlockedDate = customUnlockedDate,
                     currentProgress = badge.targetRequirement
                 )
@@ -140,7 +140,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
         val updated = _badgesFlow.value.map { badge ->
             if (badge.id == badgeId && !badge.isUnlocked) {
                 badge.copy(
-                    isUnlocked = false,
+                    isUnlocked = true,
                     unlockedDate = todayStr,
                     currentProgress = badge.targetRequirement
                 )
