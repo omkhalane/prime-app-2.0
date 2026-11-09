@@ -85,8 +85,8 @@ fun WeeklyReportScreen(
 
     val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
     val elapsedDays = (todayDow + 1).coerceAtLeast(1)
-    val totalWeekMs = trendPoints.sumOf { it.screenTimeMs }
-    val dailyAvgMs = if (trendPoints.isNotEmpty()) totalWeekMs / elapsedDays else 0L
+    val totalWeekMs = weeklyApps.sumOf { it.totalTimeMs }
+    val dailyAvgMs = if (weeklyApps.isNotEmpty()) totalWeekMs / elapsedDays else 0L
 
     val dateRangeHeader = rememberCurrentWeekRangeString()
 
@@ -216,7 +216,7 @@ fun WeeklyReportScreen(
         ) {
             Column {
                 Text(
-                    text = if (trendPoints.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(dailyAvgMs),
+                    text = if (weeklyApps.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(dailyAvgMs),
                     color = PrimeTextPrimary,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
