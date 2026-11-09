@@ -120,7 +120,9 @@ class WellbeingRepository(private val context: Context) {
                     appMap[pkg] = stat.totalTimeInForeground
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            return@withContext Result.failure(e)
+        }
 
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
@@ -570,15 +572,7 @@ class WellbeingRepository(private val context: Context) {
             val appInfo = packageManager.getApplicationInfo(packageName, 0)
             packageManager.getApplicationLabel(appInfo).toString()
         } catch (_: Exception) {
-            when {
-                packageName.contains("instagram") -> "Instagram"
-                packageName.contains("whatsapp") -> "WhatsApp"
-                packageName.contains("chrome") -> "Chrome"
-                packageName.contains("youtube") -> "YouTube"
-                packageName.contains("settings") -> "Settings"
-                packageName.contains("prime") || packageName.contains("opal") -> "Prime"
-                else -> packageName.substringAfterLast('.')
-            }
+            packageName.substringAfterLast('.')
         }
         return com.example.util.formatAppName(raw)
     }
