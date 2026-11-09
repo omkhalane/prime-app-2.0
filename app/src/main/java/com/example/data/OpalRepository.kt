@@ -952,11 +952,11 @@ class OpalRepository(private val context: Context? = null) {
         return try {
             val obj = JSONObject(jsonStr)
             PomodoroSettings(
-                focusMinutes = obj.optInt("focus_minutes", 25),
-                shortBreakMinutes = obj.optInt("short_break_minutes", 5),
-                longBreakMinutes = obj.optInt("long_break_minutes", 15),
-                roundsPerCycle = obj.optInt("rounds_per_cycle", 4),
-                totalCycles = obj.optInt("total_cycles", 1)
+                focusMinutes = obj.optInt("focus_minutes", 25).coerceIn(1, 180),
+                shortBreakMinutes = obj.optInt("short_break_minutes", 5).coerceIn(1, 60),
+                longBreakMinutes = obj.optInt("long_break_minutes", 15).coerceIn(1, 120),
+                roundsPerCycle = obj.optInt("rounds_per_cycle", 4).coerceIn(1, 12),
+                totalCycles = obj.optInt("total_cycles", 1).coerceIn(1, 20)
             )
         } catch (_: Throwable) {
             PomodoroSettings()
