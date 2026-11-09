@@ -1,7 +1,6 @@
 package com.example.data
 
 import android.app.usage.UsageEvents
-import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -123,74 +122,33 @@ class WellbeingRepository(private val context: Context) {
             }
         } catch (_: Exception) {}
 
-        // Secondary: Count exact app opens and capture session events
+        // UsageEvents provide real event counters only; foreground duration is read from
+        // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
+        val notificationCounts = mutableMapOf<String, Int>()
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
-            var currentResumedPkg: String? = null
-            var currentResumedTime: Long = 0L
-
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
-                val time = event.timeStamp
-                if (time < startTime || time > endTime) continue
-
-                val isIgnored = RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
-
+                if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
-                        if (!isIgnored) {
-                            openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                        }
-                        if (currentResumedPkg != null && currentResumedTime > 0 && currentResumedPkg != pkg) {
-                            val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                            val current = appMap[currentResumedPkg!!] ?: 0L
-                            appMap[currentResumedPkg!!] = maxOf(current, duration)
-                        }
-                        if (!isIgnored) {
-                            currentResumedPkg = pkg
-                            currentResumedTime = time
-                        } else {
-                            currentResumedPkg = null
-                            currentResumedTime = 0L
-                        }
-                    }
-                    UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED, 2, 23 -> {
-                        if (currentResumedPkg == pkg && currentResumedTime > 0) {
-                            val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                            val current = appMap[pkg] ?: 0L
-                            appMap[pkg] = maxOf(current, duration)
-                            currentResumedPkg = null
-                            currentResumedTime = 0L
-                        }
-                    }
-                    // SCREEN_NON_INTERACTIVE (16), KEYGUARD_SHOWN (17), DEVICE_SHUTDOWN (26)
-                    16, 17, 26 -> {
-                        if (currentResumedPkg != null && currentResumedTime > 0) {
-                            val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                            val current = appMap[currentResumedPkg!!] ?: 0L
-                            appMap[currentResumedPkg!!] = maxOf(current, duration)
-                            currentResumedPkg = null
-                            currentResumedTime = 0L
-                        }
-                    }
+                    UsageEvents.Event.ACTIVITY_RESUMED ->
+                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                    12 ->
+                        notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
-
-            if (currentResumedPkg != null && currentResumedTime > 0) {
-                val duration = (endTime - currentResumedTime).coerceIn(0L, 10 * 60 * 1000L)
-                val current = appMap[currentResumedPkg!!] ?: 0L
-                appMap[currentResumedPkg!!] = maxOf(current, duration)
-            }
         } catch (_: Exception) {
+            // Android may not expose these event counters on every device.
         }
 
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val opens = openCounts[pkg] ?: (duration / (8 * 60 * 1000L)).toInt().coerceAtLeast(1)
-            AppUsageData(pkg, appLabel, duration, cat, opens, 0)
+            val opens = openCounts[pkg] ?: 0
+            val notifications = notificationCounts[pkg] ?: 0
+            AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
         Result.success(result)
@@ -218,27 +176,22 @@ class WellbeingRepository(private val context: Context) {
         calendar.add(Calendar.DAY_OF_YEAR, -7)
         val startTime = calendar.timeInMillis
 
-        // Primary: Query exact interval usage stats across the 7-day period
+        // Android's aggregate API returns a total per package for the requested range.
         try {
-            val statsList: List<UsageStats>? = sm.queryUsageStats(
-                UsageStatsManager.INTERVAL_WEEKLY,
-                startTime,
-                endTime
-            )
-            statsList?.forEach { stat ->
-                val pkg = stat.packageName ?: return@forEach
-                if (stat.totalTimeInForeground > 0 && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) {
-                    val current = appMap[pkg] ?: 0L
-                    if (stat.totalTimeInForeground > current) {
-                        appMap[pkg] = stat.totalTimeInForeground
-                    }
+            val aggregated = sm.queryAndAggregateUsageStats(startTime, endTime)
+            aggregated?.forEach { (pkg, stat) ->
+                if (stat.totalTimeInForeground > 0 &&
+                    !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
+                ) {
+                    appMap[pkg] = stat.totalTimeInForeground
                 }
             }
         } catch (e: Exception) {
-            // Handled
+            return@withContext Result.failure(e)
         }
 
-        // Secondary: Scan UsageEvents for precise session opens
+        // Count real opens and notification interruption events; do not infer either from time.
+        val notificationCounts = mutableMapOf<String, Int>()
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -246,20 +199,23 @@ class WellbeingRepository(private val context: Context) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
-
-                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                when (event.eventType) {
+                    UsageEvents.Event.ACTIVITY_RESUMED ->
+                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                    12 ->
+                        notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
         } catch (_: Exception) {
-            // Handled
+            // Android may not expose every event on every device.
         }
 
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val opens = openCounts[pkg] ?: (duration / (8 * 60 * 1000L)).toInt().coerceAtLeast(1)
-            AppUsageData(pkg, appLabel, duration, cat, opens, 0)
+            val opens = openCounts[pkg] ?: 0
+            val notifications = notificationCounts[pkg] ?: 0
+            AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
         Result.success(result)
