@@ -375,6 +375,18 @@ fun AlarmScreen(
             )
         }
     }
+    
+    if (showClockSettings) {
+        ClockSettingsSheet(
+            preferences = clockPreferences,
+            onSave = {
+                onSaveClockPreferences(it)
+                showClockSettings = false
+            },
+            onDismiss = { showClockSettings = false }
+        )
+    }
+
 }
 
 @Composable
@@ -523,15 +535,3 @@ fun AlarmCardItem(
         }
     }
 }
-    
-    if (showClockSettings) {
-        ClockSettingsSheet(
-            preferences = clockPreferences,
-            onSave = {
-                onSaveClockPreferences(it)
-                showClockSettings = false
-            },
-            onDismiss = { showClockSettings = false }
-        )
-    }
-
