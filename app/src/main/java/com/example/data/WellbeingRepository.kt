@@ -582,6 +582,7 @@ class WellbeingRepository(private val context: Context) {
             var sawEvent = false
             var activePackage: String? = null
             var activeStart = 0L
+            var activeActivityCount = 0
             var screenInteractive = true
             var keyguardVisible = false
 
@@ -592,6 +593,7 @@ class WellbeingRepository(private val context: Context) {
                 }
                 activePackage = null
                 activeStart = 0L
+                activeActivityCount = 0
             }
 
             while (events.hasNextEvent()) {
@@ -602,16 +604,29 @@ class WellbeingRepository(private val context: Context) {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED, USAGE_EVENT_CONTINUE_PREVIOUS_DAY -> {
                         if (pkg != null) {
-                            closeActive(timestamp)
-                            if (screenInteractive && !keyguardVisible && launchablePackages.contains(pkg) &&
-                                !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
-                            ) {
-                                activePackage = pkg
-                                activeStart = timestamp
+                            if (activePackage != pkg) {
+                                closeActive(timestamp)
+                                if (screenInteractive && !keyguardVisible && launchablePackages.contains(pkg) &&
+                                    !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
+                                ) {
+                                    activePackage = pkg
+                                    activeStart = timestamp
+                                    activeActivityCount = 1
+                                }
+                            } else {
+                                // One package can have multiple resumed activities. Do not
+                                // end its foreground interval when only one activity pauses.
+                                activeActivityCount++
                             }
                         }
                     }
-                    UsageEvents.Event.ACTIVITY_PAUSED, USAGE_EVENT_END_OF_DAY -> {
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        if (pkg != null && activePackage == pkg) {
+                            activeActivityCount--
+                            if (activeActivityCount <= 0) closeActive(timestamp)
+                        }
+                    }
+                    USAGE_EVENT_END_OF_DAY -> {
                         if (pkg != null && activePackage == pkg) closeActive(timestamp)
                     }
                     UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
