@@ -29,6 +29,8 @@ object AlarmSoundManager {
     private var syntheticToneJob: Job? = null
     private var vibratorJob: Job? = null
     private var vibrator: Vibrator? = null
+    private var fadeJob: Job? = null
+    @Volatile private var outputGain: Float = 0.85f
     @Volatile private var activeRingtoneId: String = "zen_crystal"
     @Volatile private var muted: Boolean = false
     @Volatile var isSessionSoundEnabled: Boolean = true
@@ -83,6 +85,9 @@ object AlarmSoundManager {
         stopPlayback(context)
         activeRingtoneId = ringtoneId
         muted = false
+        val prefs = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+        outputGain = (prefs.getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f)
+        val fadeIn = prefs.getBoolean("clock_alarm_fade_in", true)
 
         if (vibrationEnabled) {
             startVibration(context)
@@ -100,9 +105,20 @@ object AlarmSoundManager {
                     )
                     setDataSource(context, uri)
                     isLooping = true
-                    setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
+                    setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
                     prepare()
                     start()
+                }
+                if (fadeIn) {
+                    fadeJob?.cancel()
+                    fadeJob = scope.launch {
+                        for (step in 1..12) {
+                            if (!isActive || muted) break
+                            val gain = outputGain * step / 12f
+                            mediaPlayer?.setVolume(gain, gain)
+                            delay(500L)
+                        }
+                    }
                 }
                 return
             } catch (_: Throwable) {
@@ -154,7 +170,7 @@ object AlarmSoundManager {
     /** Mute/unmute alarm audio without disabling vibration or dismissing the alarm. */
     fun setMuted(context: Context, isMuted: Boolean) {
         muted = isMuted
-        mediaPlayer?.setVolume(if (isMuted) 0f else 1f, if (isMuted) 0f else 1f)
+        mediaPlayer?.setVolume(if (isMuted) 0f else outputGain, if (isMuted) 0f else outputGain)
         if (mediaPlayer == null) {
             if (isMuted) {
                 syntheticToneJob?.cancel()
@@ -167,6 +183,8 @@ object AlarmSoundManager {
 
     fun stopPlayback(context: Context) {
         try {
+            fadeJob?.cancel()
+            fadeJob = null
             syntheticToneJob?.cancel()
             syntheticToneJob = null
 
@@ -255,7 +273,7 @@ object AlarmSoundManager {
                 }
                 // Fundamental + rich 2nd harmonic
                 val sample = (sin(2.0 * PI * freq * t) * 0.7 + sin(4.0 * PI * freq * t) * 0.3) * envelope
-                audioData[startIndex + j] = (sample * 28000).toInt().toShort()
+                audioData[startIndex + j] = (sample * 28000 * outputGain * if (muted) 0f else 1f).toInt().toShort()
             }
         }
 
