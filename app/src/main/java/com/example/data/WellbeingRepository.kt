@@ -117,7 +117,8 @@ class WellbeingRepository(private val context: Context) {
         // Primary: Authoritative daily aggregation from Android system
         try {
             val aggregated = sm.queryAndAggregateUsageStats(startTime, endTime)
-            aggregated?.forEach { (pkg, stat) ->
+                ?: return@withContext Result.failure(IllegalStateException("Android returned no daily usage aggregate."))
+            aggregated.forEach { (pkg, stat) ->
                 if (launchablePackages.contains(pkg) && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
                     appMap[pkg] = stat.totalTimeInForeground
                 }
@@ -193,7 +194,8 @@ class WellbeingRepository(private val context: Context) {
         // Android's aggregate API returns a total per package for the requested range.
         try {
             val aggregated = sm.queryAndAggregateUsageStats(startTime, endTime)
-            aggregated?.forEach { (pkg, stat) ->
+                ?: return@withContext Result.failure(IllegalStateException("Android returned no weekly usage aggregate."))
+            aggregated.forEach { (pkg, stat) ->
                 if (launchablePackages.contains(pkg) && stat.totalTimeInForeground > 0 &&
                     !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                 ) {
@@ -393,7 +395,8 @@ class WellbeingRepository(private val context: Context) {
             if (dayStart <= System.currentTimeMillis()) {
                 try {
                     val dailyStats = sm.queryAndAggregateUsageStats(dayStart, dayEnd)
-                    dailyStats?.forEach { (pkg, stat) ->
+                        ?: return@withContext Result.failure(IllegalStateException("Android returned no daily usage aggregate for ${dayLabels[dow]}."))
+                    dailyStats.forEach { (pkg, stat) ->
                         if (launchablePackages.contains(pkg) && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) &&
                             stat.totalTimeInForeground > 0
                         ) {
@@ -477,7 +480,8 @@ class WellbeingRepository(private val context: Context) {
             if (dayStart <= System.currentTimeMillis()) {
                 try {
                     val dailyStats = sm.queryAndAggregateUsageStats(dayStart, dayEnd)
-                    dayMs = dailyStats?.get(packageName)?.totalTimeInForeground ?: 0L
+                        ?: return@withContext Result.failure(IllegalStateException("Android returned no daily usage aggregate for $appName."))
+                    dayMs = dailyStats[packageName]?.totalTimeInForeground ?: 0L
                 } catch (e: Exception) {
                     return@withContext Result.failure(e)
                 }
