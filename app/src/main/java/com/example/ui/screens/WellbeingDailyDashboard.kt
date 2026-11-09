@@ -220,7 +220,12 @@ fun WellbeingDailyDashboard(
         }
 
         // Card 1: Screen Time Stacked Bar Chart
-        val currentScreenTime = if (totalScreenTime.isNotBlank() && totalScreenTime != "Permission Required") totalScreenTime else "0m"
+        val currentScreenTime = when {
+            !hasUsagePermission -> "Permission required"
+            trendPoints.isEmpty() -> "No data"
+            totalScreenTime.isNotBlank() && totalScreenTime != "Permission Required" -> totalScreenTime
+            else -> "No data"
+        }
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp)
@@ -236,12 +241,16 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                StackedBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("8 h", "4 h"),
-                    valueExtractor = { it.screenTimeMs },
-                    maxValue = (trendPoints.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
-                )
+                if (trendPoints.isNotEmpty()) {
+                    StackedBarChart(
+                        dataPoints = trendPoints,
+                        yAxisLabels = listOf("8 h", "4 h"),
+                        valueExtractor = { it.screenTimeMs },
+                        maxValue = (trendPoints.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
+                    )
+                } else {
+                    Text("Daily usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -323,7 +332,7 @@ fun WellbeingDailyDashboard(
         ) {
             Column {
                 Text(
-                    text = "$totalNotifs notification interruptions",
+                    text = if (trendPoints.isEmpty()) "No data" else "$totalNotifs notification interruptions",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -342,7 +351,7 @@ fun WellbeingDailyDashboard(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = if (totalNotifs > 0) "System notifications recorded today" else "No notification interruptions logged today",
+                    text = if (trendPoints.isEmpty()) "Notification event data unavailable" else if (totalNotifs > 0) "Notification interruptions recorded today" else "No notification interruptions logged today",
                     color = PrimeTextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -360,7 +369,7 @@ fun WellbeingDailyDashboard(
         ) {
             Column {
                 Text(
-                    text = "$todayUnlocks unlocks",
+                    text = if (trendPoints.isEmpty()) "No data" else "$todayUnlocks unlocks",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -369,13 +378,17 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                SingleColorBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("90", "60", "30"),
-                    valueExtractor = { it.unlocks.toLong() },
-                    maxValue = (trendPoints.maxOfOrNull { it.unlocks.toLong() } ?: 0L).coerceAtLeast(30L),
-                    barColor = PrimeInfo
-                )
+                if (trendPoints.isNotEmpty()) {
+                    SingleColorBarChart(
+                        dataPoints = trendPoints,
+                        yAxisLabels = listOf("90", "60", "30"),
+                        valueExtractor = { it.unlocks.toLong() },
+                        maxValue = (trendPoints.maxOfOrNull { it.unlocks.toLong() } ?: 0L).coerceAtLeast(30L),
+                        barColor = PrimeInfo
+                    )
+                } else {
+                    Text("Unlock event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
             }
         }
 
