@@ -965,8 +965,10 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun getTodayBlockingMinutes(): Int {
-        // Only measured blocking sessions are counted. Enabled rules are not elapsed minutes.
-        return (prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
+        // Milliseconds are accumulated only while a real enforcement service is active
+        // with at least one configured app or website target.
+        val measuredMillis = prefs?.getLong("verified_block_ms_${getTodayDateKey()}", 0L) ?: 0L
+        return (measuredMillis.coerceAtLeast(0L) / 60_000L).toInt()
     }
 
     fun addFocusMinutes(minutes: Int) {
@@ -975,9 +977,6 @@ class OpalRepository(private val context: Context? = null) {
         prefs?.edit()?.putInt("verified_focus_min_${getTodayDateKey()}", current + minutes)?.apply()
     }
 
-    fun addBlockingMinutes(minutes: Int) {
-        if (minutes <= 0) return
-        val current = prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0
-        prefs?.edit()?.putInt("verified_block_min_${getTodayDateKey()}", current + minutes)?.apply()
-    }
+    // Blocking time is recorded by BlockingManager from actual enforcement uptime.
+    // Do not manually add estimated minutes here.
 }
