@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -37,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.alarm.AlarmSchedulerHelper
 import com.example.model.AlarmItem
+import com.example.model.ClockPreferences
 import com.example.model.AlarmMode
 import com.example.model.AlarmRecurrence
 import com.example.ui.components.GlassCard
@@ -80,9 +83,12 @@ fun AlarmScreen(
     onEditAlarm: (AlarmItem) -> Unit,
     onToggleAlarm: (String, Boolean) -> Unit,
     onDeleteAlarm: (String) -> Unit,
+    clockPreferences: ClockPreferences = ClockPreferences(),
+    onSaveClockPreferences: (ClockPreferences) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showClockSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -143,15 +149,27 @@ fun AlarmScreen(
                     letterSpacing = (-0.3).sp
                 )
 
-                PrimeGlassIconButton(
-                    icon = Icons.Rounded.Add,
-                    contentDescription = "Add Alarm",
-                    onClick = onAddNewAlarm,
-                    containerSize = 40.dp,
-                    iconSize = 20.dp,
-                    tint = Color(0xFFB388FF),
-                    testTag = "add_alarm_top_button"
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PrimeGlassIconButton(
+                        icon = Icons.Rounded.Settings,
+                        contentDescription = "Clock settings",
+                        onClick = { showClockSettings = true },
+                        containerSize = 40.dp,
+                        iconSize = 19.dp,
+                        tint = Color(0xFFB8A4E8),
+                        testTag = "clock_settings_button"
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    PrimeGlassIconButton(
+                        icon = Icons.Rounded.Add,
+                        contentDescription = "Add Alarm",
+                        onClick = onAddNewAlarm,
+                        containerSize = 40.dp,
+                        iconSize = 20.dp,
+                        tint = Color(0xFFB388FF),
+                        testTag = "add_alarm_top_button"
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -505,3 +523,15 @@ fun AlarmCardItem(
         }
     }
 }
+    
+    if (showClockSettings) {
+        ClockSettingsSheet(
+            preferences = clockPreferences,
+            onSave = {
+                onSaveClockPreferences(it)
+                showClockSettings = false
+            },
+            onDismiss = { showClockSettings = false }
+        )
+    }
+
