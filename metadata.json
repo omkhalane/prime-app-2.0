@@ -1,0 +1,8 @@
+{
+  "name": "Prime",
+  "description": "Focus, app blocking, and website protection to help you reclaim your time and attention.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

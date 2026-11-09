@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Prime</string>
+    <string name="app_tagline">BECOME YOUR PRIME</string>
+    <string name="accessibility_service_description">Prime uses this service to detect when distracting apps or blocked websites are opened in Google Chrome and other browsers, helping you protect your focus.</string>
+</resources>
