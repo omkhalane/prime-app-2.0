@@ -14,6 +14,7 @@ class ClockTimerReceiver : BroadcastReceiver() {
         val serviceIntent = Intent(context, ClockTimerAlertService::class.java).apply {
             putExtra(ClockTimerAlertService.EXTRA_TITLE, intent.getStringExtra(ClockTimerAlertService.EXTRA_TITLE) ?: "Timer complete")
             putExtra(ClockTimerAlertService.EXTRA_MESSAGE, intent.getStringExtra(ClockTimerAlertService.EXTRA_MESSAGE) ?: "Your session has finished.")
+            putExtra(ClockTimerAlertService.EXTRA_SOUND_ENABLED, intent.getBooleanExtra(ClockTimerAlertService.EXTRA_SOUND_ENABLED, true))
         }
         ContextCompat.startForegroundService(context, serviceIntent)
     }
@@ -22,13 +23,14 @@ class ClockTimerReceiver : BroadcastReceiver() {
         private const val ACTION_FIRE = "com.example.action.CLOCK_TIMER_FIRE"
         private const val REQUEST_CODE = 4206
 
-        fun schedule(context: Context, delayMillis: Long, title: String, message: String) {
+        fun schedule(context: Context, delayMillis: Long, title: String, message: String, soundEnabled: Boolean = true) {
             cancel(context)
             if (delayMillis <= 0L) return
             val intent = Intent(context, ClockTimerReceiver::class.java).apply {
                 action = ACTION_FIRE
                 putExtra(ClockTimerAlertService.EXTRA_TITLE, title)
                 putExtra(ClockTimerAlertService.EXTRA_MESSAGE, message)
+                putExtra(ClockTimerAlertService.EXTRA_SOUND_ENABLED, soundEnabled)
             }
             val pending = PendingIntent.getBroadcast(
                 context, REQUEST_CODE, intent,
