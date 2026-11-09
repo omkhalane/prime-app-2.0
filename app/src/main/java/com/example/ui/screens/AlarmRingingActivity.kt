@@ -15,6 +15,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -56,12 +57,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.alarm.AlarmSchedulerHelper
 import com.example.alarm.AlarmSoundManager
 import com.example.model.AlarmMode
@@ -169,6 +173,13 @@ fun AlarmRingingScreen(
         else -> listOf(Color(0xFF16142E), Color(0xFF553B82), Color(0xFF101827))
     }
     val wallpaperAccent = wallpaperColors[1]
+    val wallpaperDrawable = when (wallpaperTheme) {
+        "sunrise" -> R.drawable.img_preset_meeting
+        "forest" -> R.drawable.img_preset_nature
+        "ocean" -> R.drawable.img_preset_commute
+        "minimal" -> R.drawable.img_preset_powernap
+        else -> R.drawable.img_timer_hero
+    }
 
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -211,8 +222,19 @@ fun AlarmRingingScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(Brush.verticalGradient(wallpaperColors))
+                .background(Color.Black)
         ) {
+            Image(
+                painter = painterResource(wallpaperDrawable),
+                contentDescription = "Selected alarm wallpaper",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(wallpaperColors.map { it.copy(alpha = 0.62f) })
+                )
+            )
             // Pulsing background ambient aura
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val cx = size.width / 2
