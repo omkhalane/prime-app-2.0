@@ -988,7 +988,6 @@ class OpalRepository(private val context: Context? = null) {
                 sessionType = PomodoroSessionType.valueOf(obj.optString("session_type", "FOCUS")),
                 currentRound = obj.optInt("current_round", 1),
                 currentCycle = obj.optInt("current_cycle", 1),
-                remainingSeconds = obj.optInt("remaining_seconds", 25 * 60),
                 totalSessionSeconds = obj.optInt("total_session_seconds", 25 * 60),
                 completedRoundsCount = obj.optInt("completed_rounds", 0),
                 isRunning = obj.optBoolean("is_running", false),
