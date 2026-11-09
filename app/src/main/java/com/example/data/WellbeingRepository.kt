@@ -439,12 +439,27 @@ class WellbeingRepository(private val context: Context) {
                     )
                     dailyStats?.forEach { stat ->
                         val pkg = stat.packageName ?: return@forEach
-                        if (!RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0) {
+                        if (!RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) &&
+                            stat.totalTimeInForeground > 0
+                        ) {
                             dayScreenTime += stat.totalTimeInForeground
                         }
                     }
                 } catch (_: Exception) { }
 
+                try {
+                    val events = sm.queryEvents(dayStart, dayEnd)
+                    val event = UsageEvents.Event()
+                    while (events.hasNextEvent()) {
+                        events.getNextEvent(event)
+                        val pkg = event.packageName
+                        when (event.eventType) {
+                            12 -> if (pkg != null &&
+                                !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
+                            ) dayNotifications++
+                            18 -> dayUnlocks++
+                        }
+                    }
                 } catch (_: Exception) { }
             }
 
