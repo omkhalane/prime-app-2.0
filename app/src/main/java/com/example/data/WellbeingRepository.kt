@@ -208,7 +208,7 @@ class WellbeingRepository(private val context: Context) {
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
+                    UsageEvents.Event.ACTIVITY_RESUMED, 1 ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
                     12 ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
