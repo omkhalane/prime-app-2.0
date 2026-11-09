@@ -33,6 +33,8 @@ class OpalRepository(private val context: Context? = null) {
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
+    // Temporary timer-session targets must survive normal dashboard refreshes.
+    private var timerSessionBlockedPackages: Set<String> = emptySet()
 
     // Initial default rules (can be edited/saved by user)
     private val defaultRules = listOf(
@@ -665,13 +667,14 @@ class OpalRepository(private val context: Context? = null) {
             .toSet()
 
         val activeRulesCount = _rulesFlow.value.count { !it.isPaused }
-        OpalAccessibilityService.blockedPackages = blockedPackageNames
+        val effectiveBlockedPackages = blockedPackageNames + timerSessionBlockedPackages
+        OpalAccessibilityService.blockedPackages = effectiveBlockedPackages
         if (blockedWebsiteDomains.isNotEmpty()) {
             val combinedWebsites = OpalAccessibilityService.blockedWebsites + blockedWebsiteDomains
             OpalAccessibilityService.updateBlockedWebsites(combinedWebsites)
         }
         OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
-                blockedPackageNames.isNotEmpty() ||
+                effectiveBlockedPackages.isNotEmpty() ||
                 OpalAccessibilityService.blockedWebsites.isNotEmpty()
         context?.let { ctx ->
             try {
@@ -681,22 +684,12 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun applyTimerSessionAppBlock(sessionPackageNames: Set<String>) {
-        val baseBlockedPackages = _appsFlow.value
-            .filter { it.isBlocked && !it.isWebsite && it.packageName.isNotBlank() }
-            .map { it.packageName }
-            .toSet()
-
-        val combinedBlocked = baseBlockedPackages + sessionPackageNames
-        OpalAccessibilityService.blockedPackages = combinedBlocked
-        OpalAccessibilityService.isBlockingActive = combinedBlocked.isNotEmpty() || OpalAccessibilityService.blockedWebsites.isNotEmpty()
-        context?.let { ctx ->
-            try {
-                com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
-            } catch (_: Exception) { }
-        }
+        timerSessionBlockedPackages = sessionPackageNames
+        syncAccessibilityBlockList()
     }
 
     fun clearTimerSessionAppBlock() {
+        timerSessionBlockedPackages = emptySet()
         syncAccessibilityBlockList()
     }
 
