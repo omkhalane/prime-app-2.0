@@ -18,6 +18,24 @@ class BootReceiver : BroadcastReceiver() {
             for (alarm in enabledAlarms) {
                 AlarmSchedulerHelper.scheduleAlarm(context, alarm)
             }
+            val timer = repository.getSavedStandardTimerState()
+            if (timer.third && !repository.getSavedStandardTimerPaused()) {
+                ClockTimerReceiver.schedule(
+                    context,
+                    (timer.first.coerceAtLeast(1)) * 1000L,
+                    "Focus timer complete",
+                    "Your focus session is finished. Take a mindful break."
+                )
+            }
+            val pomodoro = repository.pomodoroStateFlow.value
+            if (pomodoro.isRunning && !pomodoro.isPaused) {
+                ClockTimerReceiver.schedule(
+                    context,
+                    pomodoro.remainingSeconds.coerceAtLeast(1) * 1000L,
+                    "Pomodoro session complete",
+                    "Your ${pomodoro.sessionType.displayName.lowercase()} session is finished."
+                )
+            }
             com.example.vpn.service.BlockingRecoveryManager.reconcileOnBoot(context)
         }
     }
