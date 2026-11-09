@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import android.os.Build
 import android.app.RingtoneManager
 import android.content.Intent
 import android.net.Uri
@@ -19,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.example.model.ClockPreferences
+import com.example.alarm.AlarmSoundManager
 
 private data class ClockThemeOption(val id: String, val title: String, val colors: List<Color>)
 
@@ -84,7 +88,12 @@ fun ClockSettingsSheet(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            val uri = if (Build.VERSION.SDK_INT >= 33) {
+                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                result.data?.getParcelableExtra<Uri>(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
+            }
             if (uri != null) {
                 val ringtone = RingtoneManager.getRingtone(context, uri)
                 value = value.copy(
@@ -138,6 +147,29 @@ fun ClockSettingsSheet(
                 Text("Default alarm sound", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
             Text(value.defaultRingtoneName, color = Color(0xFFB7BBC5), fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp, bottom = 10.dp))
+            Text("Prime built-in tones", color = Color(0xFF9CA3AF), fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                AlarmSoundManager.BUILT_IN_RINGTONES.forEach { tone ->
+                    val selected = value.defaultRingtoneId == tone.id
+                    Button(
+                        onClick = {
+                            value = value.copy(
+                                defaultRingtoneId = tone.id,
+                                defaultRingtoneName = tone.title,
+                                defaultRingtoneUriString = null
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selected) Color(0xFF8063C5) else Color(0xFF252A34)
+                        )
+                    ) {
+                        Text(tone.title, fontSize = 10.sp, maxLines = 1)
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = {
                     val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
