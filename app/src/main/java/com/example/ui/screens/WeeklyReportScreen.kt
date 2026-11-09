@@ -83,8 +83,10 @@ fun WeeklyReportScreen(
         onBackClick()
     }
 
-    val totalWeekMs = trendPoints.sumOf { it.screenTimeMs }.coerceAtLeast(weeklyApps.sumOf { it.totalTimeMs })
-    val dailyAvgMs = if (trendPoints.isNotEmpty()) totalWeekMs / 7 else 0L
+    val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+    val elapsedDays = (todayDow + 1).coerceAtLeast(1)
+    val totalWeekMs = trendPoints.sumOf { it.screenTimeMs }
+    val dailyAvgMs = if (trendPoints.isNotEmpty()) totalWeekMs / elapsedDays else 0L
 
     val dateRangeHeader = rememberCurrentWeekRangeString()
 
@@ -242,8 +244,8 @@ fun WeeklyReportScreen(
 
         // 2. Top Category Spotlight
         val topCategoryName = weeklyApps.groupBy { it.category }
-            .maxByOrNull { entry -> entry.value.sumOf { it.totalTimeMs } }?.key ?: "Social"
-        val topCategoryApps = weeklyApps.filter { it.category == topCategoryName }
+            .maxByOrNull { entry -> entry.value.sumOf { it.totalTimeMs } }?.key
+        val topCategoryApps = topCategoryName?.let { category -> weeklyApps.filter { it.category == category } }.orEmpty()
         val categoryTotalMs = topCategoryApps.sumOf { it.totalTimeMs }
 
         GlassCard(
@@ -257,7 +259,7 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = topCategoryName,
+                        text = topCategoryName ?: "No usage data",
                         color = PrimeTextPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
@@ -292,7 +294,7 @@ fun WeeklyReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${RealScreenTimeTracker.formatDuration(categoryTotalMs / 7)} daily average for this category",
+                    text = "${RealScreenTimeTracker.formatDuration(categoryTotalMs / elapsedDays)} daily average for this category",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
@@ -338,7 +340,7 @@ fun WeeklyReportScreen(
                     }
                 } else {
                     Text(
-                        text = if (!hasUsagePermission) "Permission needed to view category usage" else "No $topCategoryName activity tracked this week",
+                        text = if (!hasUsagePermission) "Permission needed to view category usage" else "No category activity tracked this week",
                         color = PrimeTextSecondary,
                         fontSize = 13.sp
                     )
@@ -394,8 +396,7 @@ fun WeeklyReportScreen(
                     val legendLevels = listOf(
                         "0~15" to Color(0xFF263238),
                         "15~30" to Color(0xFF1E88E5),
-                        "30~45" to Color(0xFF0D47A1),
-                        "45~60" to PrimeAccent
+                        "30+" to PrimeAccent
                     )
                     legendLevels.forEach { (label, color) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
