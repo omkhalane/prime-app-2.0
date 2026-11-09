@@ -244,11 +244,12 @@ fun WellbeingDailyDashboard(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 if (trendPoints.isNotEmpty()) {
-                    StackedBarChart(
+                    SingleColorBarChart(
                         dataPoints = trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 },
                         yAxisLabels = listOf("8 h", "4 h"),
                         valueExtractor = { it.screenTimeMs },
-                        maxValue = (trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
+                        maxValue = (trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000),
+                        barColor = PrimeInfo
                     )
                 } else {
                     Text("Daily usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
@@ -345,11 +346,12 @@ fun WellbeingDailyDashboard(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 if (notificationPoints.isNotEmpty()) {
-                    StackedBarChart(
+                    SingleColorBarChart(
                         dataPoints = notificationPoints,
                         yAxisLabels = listOf("300", "200", "100"),
                         valueExtractor = { it.notifications.toLong() },
-                        maxValue = (notificationPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L)
+                        maxValue = (notificationPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L),
+                        barColor = PrimeInfo
                     )
                 } else {
                     Text("Notification event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
