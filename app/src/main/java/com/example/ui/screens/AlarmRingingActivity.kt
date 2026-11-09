@@ -157,6 +157,18 @@ fun AlarmRingingScreen(
     var isChallengeActive by remember { mutableStateOf(false) }
     var isSoundMuted by remember { mutableStateOf(false) }
     val alarmContext = LocalContext.current
+    val wallpaperTheme = remember {
+        alarmContext.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+            .getString("clock_alarm_wallpaper", "aurora") ?: "aurora"
+    }
+    val wallpaperColors = when (wallpaperTheme) {
+        "sunrise" -> listOf(Color(0xFF4D1F32), Color(0xFFB85C43), Color(0xFF24152E))
+        "forest" -> listOf(Color(0xFF102D27), Color(0xFF28705A), Color(0xFF101D25))
+        "ocean" -> listOf(Color(0xFF10263D), Color(0xFF176A83), Color(0xFF101827))
+        "minimal" -> listOf(Color(0xFF252832), Color(0xFF414653), Color(0xFF14161C))
+        else -> listOf(Color(0xFF16142E), Color(0xFF553B82), Color(0xFF101827))
+    }
+    val wallpaperAccent = wallpaperColors[1]
 
     var currentTimeMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -199,7 +211,7 @@ fun AlarmRingingScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(Color(0xFF0C0714))
+                .background(Brush.verticalGradient(wallpaperColors))
         ) {
             // Pulsing background ambient aura
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -208,8 +220,8 @@ fun AlarmRingingScreen(
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFFB388FF).copy(alpha = 0.35f * pulseScale),
-                            Color(0xFF7C4DFF).copy(alpha = 0.15f * pulseScale),
+                            wallpaperAccent.copy(alpha = 0.38f * pulseScale),
+                            wallpaperColors[0].copy(alpha = 0.22f * pulseScale),
                             Color.Transparent
                         ),
                         center = Offset(cx, cy),
@@ -235,14 +247,14 @@ fun AlarmRingingScreen(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFB388FF).copy(alpha = 0.25f))
-                            .border(2.dp, Color(0xFFB388FF), CircleShape),
+                            .background(wallpaperAccent.copy(alpha = 0.25f))
+                            .border(2.dp, wallpaperAccent, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.NotificationsActive,
                             contentDescription = "Ringing",
-                            tint = Color(0xFFD1C4E9),
+                            tint = wallpaperColors[1].copy(alpha = 0.95f),
                             modifier = Modifier.size(36.dp)
                         )
                     }
