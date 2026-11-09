@@ -233,7 +233,7 @@ fun WeeklyReportScreen(
 
                 if (trendPoints.isNotEmpty()) {
                     WeeklyAverageBarChart(
-                        dailyTimes = trendPoints.map { it.screenTimeMs },
+                        dailyTimes = trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.map { it.screenTimeMs },
                         dailyAvgMs = dailyAvgMs
                     )
                 } else {
@@ -644,7 +644,7 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 row.forEach { intensity ->
-                    val color = colorLevels.getOrElse(intensity) { colorLevels.last() }
+                    val color = if (intensity < 0) PrimeBackground else colorLevels.getOrElse(intensity) { colorLevels.last() }
                     Box(
                         modifier = Modifier
                             .weight(1f)
