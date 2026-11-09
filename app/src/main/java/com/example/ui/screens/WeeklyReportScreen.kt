@@ -394,8 +394,9 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val legendLevels = listOf(
-                        "0~15" to Color(0xFF263238),
-                        "15~30" to Color(0xFF1E88E5),
+                        "0" to Color(0xFF263238),
+                        "1~14" to Color(0xFF1E88E5),
+                        "15~29" to Color(0xFF0D47A1),
                         "30+" to PrimeAccent
                     )
                     legendLevels.forEach { (label, color) ->
