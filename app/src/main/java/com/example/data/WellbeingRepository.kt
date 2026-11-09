@@ -12,6 +12,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
+// Android exposes this UsageEvents event as a @SystemApi, so keep its stable
+// platform event value here instead of referencing a non-SDK constant.
+private const val USAGE_EVENT_NOTIFICATION_INTERRUPTION = 12
+
 data class AppUsageData(
     val packageName: String,
     val appName: String,
@@ -141,7 +145,7 @@ class WellbeingRepository(private val context: Context) {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    UsageEvents.Event.NOTIFICATION_INTERRUPTION ->
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
@@ -500,7 +504,7 @@ class WellbeingRepository(private val context: Context) {
                         if (event.packageName == packageName) {
                             sawAppEvent = true
                             when (event.eventType) {
-                                UsageEvents.Event.ACTIVITY_RESUMED, 1 -> opens++
+                                UsageEvents.Event.ACTIVITY_RESUMED -> opens++
                                 UsageEvents.Event.NOTIFICATION_INTERRUPTION -> notifications++
                             }
                         }
