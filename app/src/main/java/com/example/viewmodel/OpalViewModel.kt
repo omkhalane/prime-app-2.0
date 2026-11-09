@@ -597,9 +597,6 @@ class OpalViewModel(
             repository.applyTimerSessionAppBlock(sessionPackages)
         }
 
-        // Automatically count focus activity towards the user's streak
-        repository.logActivityAndBoostStreak()
-
         // Activate website blocking shield during focus session
         blockingManager?.onFocusSessionStarted()
 
@@ -735,7 +732,6 @@ class OpalViewModel(
         )
         _uiState.value = _uiState.value.copy(pomodoroState = runningState)
         repository.savePomodoroState(runningState)
-        repository.logActivityAndBoostStreak()
 
         launchPomodoroLoop()
     }
@@ -783,7 +779,7 @@ class OpalViewModel(
                 if (!curr.isPaused && curr.isRunning) {
                     val nextRemaining = curr.remainingSeconds - 1
                     if (nextRemaining <= 0) {
-                        transitionToNextPomodoroSession()
+                        transitionToNextPomodoroSession(completedNaturally = true)
                     } else {
                         val updated = curr.copy(remainingSeconds = nextRemaining)
                         _uiState.value = _uiState.value.copy(pomodoroState = updated)
@@ -794,17 +790,20 @@ class OpalViewModel(
         }
     }
 
-    private fun transitionToNextPomodoroSession() {
+    private fun transitionToNextPomodoroSession(completedNaturally: Boolean = false) {
         AlarmSoundManager.playSessionTransitionChime()
         val settings = _uiState.value.pomodoroSettings
         val curr = _uiState.value.pomodoroState
 
         when (curr.sessionType) {
             PomodoroSessionType.FOCUS -> {
-                repository.addFocusMinutes(settings.focusMinutes)
-                repository.refreshRealScreenTime()
-                val nextRounds = curr.completedRoundsCount + 1
-                if (curr.currentRound >= settings.roundsPerCycle) {
+                if (completedNaturally) {
+                    repository.addFocusMinutes(settings.focusMinutes)
+                    repository.logActivityAndBoostStreak()
+                    repository.refreshRealScreenTime()
+                }
+                val nextRounds = curr.completedRoundsCount + if (completedNaturally) 1 else 0
+                if (completedNaturally && curr.currentRound >= settings.roundsPerCycle) {
                     val longBreakSec = settings.longBreakMinutes * 60
                     val nextState = curr.copy(
                         sessionType = PomodoroSessionType.LONG_BREAK,
@@ -883,10 +882,9 @@ class OpalViewModel(
                 }
             }
         }
-        repository.logActivityAndBoostStreak()
     }
 
-    // ==================== STOPWATCH CONTROLS ====================
+    // ==================== STOPWATCH CONTROLS ===================
 
     fun startStopwatch() {
         stopwatchStartTime = System.currentTimeMillis()
