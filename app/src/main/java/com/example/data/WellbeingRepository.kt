@@ -502,7 +502,7 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
                 if (!sawAppEvent && dayMs > 0L) {
-                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for $appName on $dayLabel."))
+                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for $appName on weekday index $dow."))
                 }
             }
 
