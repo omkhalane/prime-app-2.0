@@ -379,20 +379,17 @@ class WellbeingRepository(private val context: Context) {
 
             if (dayStart <= System.currentTimeMillis()) {
                 try {
-                    val dailyStats = sm.queryUsageStats(
-                        UsageStatsManager.INTERVAL_DAILY,
-                        dayStart,
-                        dayEnd
-                    )
-                    dailyStats?.forEach { stat ->
-                        val pkg = stat.packageName ?: return@forEach
+                    val dailyStats = sm.queryAndAggregateUsageStats(dayStart, dayEnd)
+                    dailyStats?.forEach { (pkg, stat) ->
                         if (!RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) &&
                             stat.totalTimeInForeground > 0
                         ) {
                             dayScreenTime += stat.totalTimeInForeground
                         }
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    return@withContext Result.failure(e)
+                }
 
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
@@ -407,7 +404,9 @@ class WellbeingRepository(private val context: Context) {
                             18 -> dayUnlocks++
                         }
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    return@withContext Result.failure(e)
+                }
             }
 
             points.add(
@@ -459,15 +458,11 @@ class WellbeingRepository(private val context: Context) {
 
             if (dayStart <= System.currentTimeMillis()) {
                 try {
-                    val dailyStats = sm.queryUsageStats(
-                        UsageStatsManager.INTERVAL_DAILY,
-                        dayStart,
-                        dayEnd
-                    )
-                    dailyStats?.find { it.packageName == packageName }?.let {
-                        dayMs = it.totalTimeInForeground
-                    }
-                } catch (_: Exception) { }
+                    val dailyStats = sm.queryAndAggregateUsageStats(dayStart, dayEnd)
+                    dayMs = dailyStats?.get(packageName)?.totalTimeInForeground ?: 0L
+                } catch (e: Exception) {
+                    return@withContext Result.failure(e)
+                }
 
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
@@ -476,12 +471,14 @@ class WellbeingRepository(private val context: Context) {
                         events.getNextEvent(event)
                         if (event.packageName == packageName) {
                             when (event.eventType) {
-                                UsageEvents.Event.ACTIVITY_RESUMED -> opens++
+                                UsageEvents.Event.ACTIVITY_RESUMED, 1 -> opens++
                                 12 -> notifications++
                             }
                         }
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    return@withContext Result.failure(e)
+                }
             }
 
             dailyTimes.add(dayMs)
@@ -492,8 +489,9 @@ class WellbeingRepository(private val context: Context) {
             totalWeeklyNotifications += notifications
         }
 
-        val dailyAvgMs = totalWeeklyMs / 7
-        val dailyAvgOpens = totalWeeklyOpens / 7
+        val elapsedDays = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)).coerceAtLeast(1)
+        val dailyAvgMs = totalWeeklyMs / elapsedDays
+        val dailyAvgOpens = totalWeeklyOpens / elapsedDays
 
         Result.success(
             AppSpecificMetric(
@@ -502,7 +500,7 @@ class WellbeingRepository(private val context: Context) {
                 weeklyTotalTimeMs = totalWeeklyMs,
                 dailyAvgTimeMs = dailyAvgMs,
                 weeklyNotifications = totalWeeklyNotifications,
-                dailyAvgNotifications = totalWeeklyNotifications / 7,
+                dailyAvgNotifications = totalWeeklyNotifications / elapsedDays,
                 weeklyAppOpens = totalWeeklyOpens,
                 dailyAvgAppOpens = dailyAvgOpens,
                 dailyScreenTime = dailyTimes,
