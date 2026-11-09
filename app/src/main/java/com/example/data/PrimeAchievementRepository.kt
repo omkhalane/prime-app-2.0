@@ -66,14 +66,19 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     private fun loadBadges(): List<PrimeBadge> {
-        // The old demo initialized bonus XP at 450 before any verified quest claim.
-        // Remove that one-time seed while preserving XP earned above the old baseline.
-        if (prefs?.getBoolean("seeded_xp_cleanup_v1", false) != true) {
-            val legacyBonusXp = prefs?.getInt("bonus_xp", 0) ?: 0
-            prefs?.edit()
-                ?.putInt("bonus_xp", (legacyBonusXp - 450).coerceAtLeast(0))
-                ?.putBoolean("seeded_xp_cleanup_v1", true)
-                ?.apply()
+        // The previous quest flow shipped with demo-completed quests and allowed
+        // claims without checking completion. Its stored XP/claim history is not verifiable.
+        if (prefs?.getBoolean("seeded_achievement_cleanup_v2", false) != true) {
+            val editor = prefs?.edit()
+                ?.putInt("bonus_xp", 0)
+                ?.putBoolean("seeded_achievement_cleanup_v2", true)
+            prefs?.all?.keys.orEmpty()
+                .filter {
+                    it.startsWith("claimed_daily_quests_") ||
+                        it.startsWith("claimed_weekly_missions_")
+                }
+                .forEach { editor?.remove(it) }
+            editor?.apply()
         }
 
         val unlockedJson = prefs?.getString("unlocked_badges_set", null)
