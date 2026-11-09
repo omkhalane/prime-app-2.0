@@ -141,7 +141,7 @@ class WellbeingRepository(private val context: Context) {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    12 ->
+                    UsageEvents.Event.NOTIFICATION_INTERRUPTION ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
@@ -421,10 +421,10 @@ class WellbeingRepository(private val context: Context) {
                         sawDailyEvent = true
                         val pkg = event.packageName
                         when (event.eventType) {
-                            12 -> if (pkg != null &&
+                            UsageEvents.Event.NOTIFICATION_INTERRUPTION -> if (pkg != null &&
                                 !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                             ) dayNotifications++
-                            18 -> dayUnlocks++
+                            UsageEvents.Event.KEYGUARD_HIDDEN -> dayUnlocks++
                         }
                     }
                 } catch (e: Exception) {
@@ -608,12 +608,16 @@ class WellbeingRepository(private val context: Context) {
                     UsageEvents.Event.ACTIVITY_PAUSED -> {
                         if (pkg != null && activePackage == pkg) closeActive(timestamp)
                     }
-                    16, 17 -> {
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
                         closeActive(timestamp)
-                        if (event.eventType == 16) screenInteractive = false else keyguardVisible = true
+                        if (event.eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                            screenInteractive = false
+                        } else {
+                            keyguardVisible = true
+                        }
                     }
-                    15 -> screenInteractive = true
-                    18 -> keyguardVisible = false
+                    UsageEvents.Event.SCREEN_INTERACTIVE -> screenInteractive = true
+                    UsageEvents.Event.KEYGUARD_HIDDEN -> keyguardVisible = false
                 }
             }
             closeActive(endTime)
