@@ -66,6 +66,16 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     private fun loadBadges(): List<PrimeBadge> {
+        // The old demo initialized bonus XP at 450 before any verified quest claim.
+        // Remove that one-time seed while preserving XP earned above the old baseline.
+        if (prefs?.getBoolean("seeded_xp_cleanup_v1", false) != true) {
+            val legacyBonusXp = prefs?.getInt("bonus_xp", 0) ?: 0
+            prefs?.edit()
+                ?.putInt("bonus_xp", (legacyBonusXp - 450).coerceAtLeast(0))
+                ?.putBoolean("seeded_xp_cleanup_v1", true)
+                ?.apply()
+        }
+
         val unlockedJson = prefs?.getString("unlocked_badges_set", null)
         val unlockedMap = mutableMapOf<String, String>() // id to date
         if (unlockedJson != null) {
@@ -122,6 +132,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     fun pinBadgeToFavorite(badgeId: String) {
+        if (_badgesFlow.value.none { it.id == badgeId && it.isUnlocked }) return
         val current = _progressionFlow.value.pinnedBadgeIds.toMutableList()
         if (current.contains(badgeId)) {
             current.remove(badgeId)
@@ -325,6 +336,10 @@ class PrimeAchievementRepository(private val context: Context? = null) {
 
         val savedPinned = prefs?.getStringSet("pinned_badge_ids", null)
             ?: emptySet()
+        val validPinned = savedPinned.filter { id -> unlocked.any { it.id == id } }.takeLast(3)
+        if (validPinned.toSet() != savedPinned) {
+            prefs?.edit()?.putStringSet("pinned_badge_ids", validPinned.toSet())?.apply()
+        }
 
         val totalCount = badges.size
         val unlockedCount = unlocked.size
@@ -335,7 +350,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
             primeLevel = level,
             currentLevelXp = currentLevelXp,
             xpForNextLevel = xpForNext,
-            pinnedBadgeIds = savedPinned.toList(),
+            pinnedBadgeIds = validPinned,
             totalBadgesCount = totalCount,
             unlockedBadgesCount = unlockedCount,
             completionPercentage = (completionPct * 10).roundToInt() / 10f
