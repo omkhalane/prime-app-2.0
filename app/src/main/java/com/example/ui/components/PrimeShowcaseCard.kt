@@ -283,7 +283,7 @@ fun PrimeShowcaseCard(
                             }
                         } else {
                             Text(
-                                text = "${quest.currentProgress}/${quest.targetProgress} ${quest.unit}",
+                                text = if (quest.currentProgress >= 0) "${quest.currentProgress}/${quest.targetProgress} ${quest.unit}" else "Usage unavailable",
                                 color = OpalTextSecondary,
                                 fontSize = 11.sp
                             )
