@@ -90,6 +90,11 @@ class BlockingManager private constructor(private val context: Context) {
         checkpointBlockingDuration()
     }
 
+    /** Flush the current active interval before a wellbeing score is read. */
+    fun flushBlockingDuration() {
+        checkpointBlockingDuration()
+    }
+
     /**
      * Count only while a configured target is protected by a running enforcement service.
      * Checkpointing every 15 seconds limits lost time if Android kills the process.
