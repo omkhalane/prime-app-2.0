@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import com.example.util.PermissionHelper
 import kotlinx.coroutines.Dispatchers
@@ -109,7 +110,7 @@ class WellbeingRepository(private val context: Context) {
 
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
-        val packagesWithEvents = mutableSetOf<String>()
+        var previousForegroundPackage: String? = null
 
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -136,6 +137,8 @@ class WellbeingRepository(private val context: Context) {
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawNotificationEvent = false
+        var eventQuerySucceeded = true
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -143,23 +146,35 @@ class WellbeingRepository(private val context: Context) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
-                packagesWithEvents.add(pkg)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
-                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        // Count an app becoming foreground, not every Activity resume
+                        // inside the same app (which inflated the old "opens" metric).
+                        if (previousForegroundPackage != pkg) {
+                            openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                        }
+                        previousForegroundPackage = pkg
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        if (previousForegroundPackage == pkg) previousForegroundPackage = null
+                    }
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                        previousForegroundPackage = null
+                    }
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
+                        sawNotificationEvent = true
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
+                    }
                 }
             }
         } catch (_: Exception) {
-            // Android foreground durations remain valid; event counters stay null when unavailable.
+            eventQuerySucceeded = false
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
-            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
+            val opens = if (eventQuerySucceeded) openCounts[pkg] else null
+            val notifications = if (eventQuerySucceeded && sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -185,6 +200,7 @@ class WellbeingRepository(private val context: Context) {
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
         val packagesWithEvents = mutableSetOf<String>()
+        var previousForegroundPackage: String? = null
 
         val calendar = Calendar.getInstance().apply {
             firstDayOfWeek = Calendar.SUNDAY
@@ -214,6 +230,9 @@ class WellbeingRepository(private val context: Context) {
 
         // Count real opens and notification interruption events; do not infer either from time.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawOpenEvent = false
+        var sawNotificationEvent = false
+        var eventQuerySucceeded = true
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -223,21 +242,36 @@ class WellbeingRepository(private val context: Context) {
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 packagesWithEvents.add(pkg)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
-                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        sawOpenEvent = true
+                        // Count an app becoming foreground, not every Activity resume
+                        // inside the same app (which inflated the old "opens" metric).
+                        if (previousForegroundPackage != pkg) {
+                            openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                        }
+                        previousForegroundPackage = pkg
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        if (previousForegroundPackage == pkg) previousForegroundPackage = null
+                    }
+                    UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                        previousForegroundPackage = null
+                    }
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
+                        sawNotificationEvent = true
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
+                    }
                 }
             }
         } catch (_: Exception) {
-            // Android foreground durations remain valid; event counters stay null when unavailable.
+            eventQuerySucceeded = false
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
             val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
-            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
+            val opens = if (sawOpenEvent) openCounts[pkg] ?: 0 else null
+            val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -418,34 +452,41 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
 
-                var eventCountersAvailable = true
-                var sawDailyEvent = false
+                var sawNotificationEvent = false
+                var sawUnlockEvent = false
+                var eventQuerySucceeded = true
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
-                        sawDailyEvent = true
                         val pkg = event.packageName
                         when (event.eventType) {
-                            USAGE_EVENT_NOTIFICATION_INTERRUPTION -> if (pkg != null &&
-                                !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
-                            ) dayNotifications++
-                            UsageEvents.Event.KEYGUARD_HIDDEN -> dayUnlocks++
+                            USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
+                                sawNotificationEvent = true
+                                if (pkg != null && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) {
+                                    dayNotifications++
+                                }
+                            }
+                            UsageEvents.Event.KEYGUARD_HIDDEN -> {
+                                sawUnlockEvent = true
+                                dayUnlocks++
+                            }
                         }
                     }
                 } catch (_: Exception) {
-                    eventCountersAvailable = false
+                    eventQuerySucceeded = false
                 }
-                if (!sawDailyEvent) eventCountersAvailable = false
 
                 points.add(
                     DayUsagePoint(
                         dayLabel = dayLabels[dow],
                         dayIndex = dow,
                         screenTimeMs = dayScreenTime,
-                        notifications = if (eventCountersAvailable) dayNotifications else -1,
-                        unlocks = if (eventCountersAvailable) dayUnlocks else -1,
+                        // UsageEvents may be unavailable or restricted by the device.
+                        // Never display an inferred zero as a verified count.
+                        notifications = if (eventQuerySucceeded && sawNotificationEvent) dayNotifications else -1,
+                        unlocks = if (eventQuerySucceeded && sawUnlockEvent) dayUnlocks else -1,
                         isToday = (dow == todayDow)
                     )
                 )
@@ -480,6 +521,8 @@ class WellbeingRepository(private val context: Context) {
         var totalWeeklyMs = 0L
         var totalWeeklyOpens = 0
         var totalWeeklyNotifications = 0
+        var allOpenCountsAvailable = true
+        var allNotificationCountsAvailable = true
 
         for (dow in 0..6) {
             val cal = Calendar.getInstance().apply {
@@ -497,6 +540,8 @@ class WellbeingRepository(private val context: Context) {
             var dayMs = 0L
             var opens = 0
             var notifications = 0
+            var openCountAvailable = false
+            var notificationCountAvailable = false
 
             if (dayStart <= System.currentTimeMillis()) {
                 try {
@@ -507,39 +552,54 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
 
-                var sawAppEvent = false
+                var previousForegroundPackage: String? = null
+                var eventQuerySucceeded = true
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
-                        if (event.packageName == packageName) {
-                            sawAppEvent = true
-                            when (event.eventType) {
-                                UsageEvents.Event.ACTIVITY_RESUMED -> opens++
-                                USAGE_EVENT_NOTIFICATION_INTERRUPTION -> notifications++
+                        val eventPackage = event.packageName
+                        when (event.eventType) {
+                            UsageEvents.Event.ACTIVITY_RESUMED -> {
+                                if (eventPackage == packageName) {
+                                    openCountAvailable = true
+                                    if (previousForegroundPackage != packageName) opens++
+                                }
+                                previousForegroundPackage = eventPackage
+                            }
+                            UsageEvents.Event.ACTIVITY_PAUSED -> {
+                                if (previousForegroundPackage == eventPackage) previousForegroundPackage = null
+                            }
+                            UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
+                                previousForegroundPackage = null
+                            }
+                            USAGE_EVENT_NOTIFICATION_INTERRUPTION -> if (eventPackage == packageName) {
+                                notificationCountAvailable = true
+                                notifications++
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    return@withContext Result.failure(e)
+                } catch (_: Exception) {
+                    eventQuerySucceeded = false
                 }
-                if (!sawAppEvent && dayMs > 0L) {
-                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for $appName on weekday index $dow."))
-                }
+                openCountAvailable = openCountAvailable && eventQuerySucceeded
+                notificationCountAvailable = notificationCountAvailable && eventQuerySucceeded
             }
 
             dailyTimes.add(dayMs)
-            dailyOpens.add(opens)
-            dailyNotifications.add(notifications)
+            dailyOpens.add(if (dayStart > System.currentTimeMillis() || dayMs == 0L || openCountAvailable) opens else -1)
+            dailyNotifications.add(if (dayStart > System.currentTimeMillis() || notificationCountAvailable) notifications else -1)
             totalWeeklyMs += dayMs
-            totalWeeklyOpens += opens
-            totalWeeklyNotifications += notifications
+            if (dayStart <= System.currentTimeMillis()) {
+                if (dayMs == 0L || openCountAvailable) totalWeeklyOpens += opens else allOpenCountsAvailable = false
+                if (notificationCountAvailable) totalWeeklyNotifications += notifications else allNotificationCountsAvailable = false
+            }
         }
 
         val elapsedDays = (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)).coerceAtLeast(1)
         val dailyAvgMs = totalWeeklyMs / elapsedDays
-        val dailyAvgOpens = totalWeeklyOpens / elapsedDays
+        val dailyAvgOpens = if (allOpenCountsAvailable) totalWeeklyOpens / elapsedDays else -1
 
         Result.success(
             AppSpecificMetric(
@@ -547,9 +607,9 @@ class WellbeingRepository(private val context: Context) {
                 appName = appName,
                 weeklyTotalTimeMs = totalWeeklyMs,
                 dailyAvgTimeMs = dailyAvgMs,
-                weeklyNotifications = totalWeeklyNotifications,
-                dailyAvgNotifications = totalWeeklyNotifications / elapsedDays,
-                weeklyAppOpens = totalWeeklyOpens,
+                weeklyNotifications = if (allNotificationCountsAvailable) totalWeeklyNotifications else -1,
+                dailyAvgNotifications = if (allNotificationCountsAvailable) totalWeeklyNotifications / elapsedDays else -1,
+                weeklyAppOpens = if (allOpenCountsAvailable) totalWeeklyOpens else -1,
                 dailyAvgAppOpens = dailyAvgOpens,
                 dailyScreenTime = dailyTimes,
                 dailyNotifications = dailyNotifications,
@@ -672,8 +732,31 @@ class WellbeingRepository(private val context: Context) {
         return com.example.util.formatAppName(raw)
     }
 
+    /**
+     * Prefer the category declared by the installed Android application.
+     * Name/package substring matching is only a fallback because it routinely
+     * misclassifies browsers, messaging clients and finance apps.
+     */
     private fun getAppCategory(packageName: String): String {
-        val appName = getAppName(packageName)
-        return RealScreenTimeTracker.getDigitalWellbeingCategory(context, packageName, appName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val platformCategory = try {
+                packageManager.getApplicationInfo(packageName, 0).category
+            } catch (_: Exception) {
+                ApplicationInfo.CATEGORY_UNDEFINED
+            }
+            when (platformCategory) {
+                ApplicationInfo.CATEGORY_GAME -> return "Games"
+                ApplicationInfo.CATEGORY_AUDIO -> return "Audio"
+                ApplicationInfo.CATEGORY_VIDEO -> return "Video"
+                ApplicationInfo.CATEGORY_IMAGE -> return "Photos"
+                ApplicationInfo.CATEGORY_SOCIAL -> return "Social"
+                ApplicationInfo.CATEGORY_NEWS -> return "News"
+                ApplicationInfo.CATEGORY_MAPS -> return "Maps"
+                ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "Productivity"
+            }
+        }
+        return RealScreenTimeTracker.getDigitalWellbeingCategory(
+            context, packageName, getAppName(packageName)
+        )
     }
 }

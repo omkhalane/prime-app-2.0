@@ -244,7 +244,7 @@ fun AppSpecificReportScreen(
         ) {
             Column {
                 Text(
-                    text = "${metric.dailyAvgNotifications} notification interruptions / day",
+                    text = if (metric.dailyAvgNotifications < 0) "Notification data unavailable" else "${metric.dailyAvgNotifications} notifications / day",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -254,29 +254,35 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${metric.weeklyNotifications} notification interruptions this week",
+                    text = if (metric.weeklyNotifications < 0) "Android did not provide notification event history" else "${metric.weeklyNotifications} notifications this week",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                SingleColorBarChart(
-                    dataPoints = metric.dailyNotifications.take(todayDow + 1).mapIndexed { i, count ->
-                        DayUsagePoint(
+                val notificationPoints = metric.dailyNotifications.take(todayDow + 1)
+                    .mapIndexedNotNull { i, count ->
+                        if (count < 0) null else DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
                             screenTimeMs = metric.dailyScreenTime.getOrElse(i) { 0L },
                             notifications = count,
-                            unlocks = metric.dailyAppOpens.getOrElse(i) { 0 },
+                            unlocks = metric.dailyAppOpens.getOrElse(i) { -1 },
                             isToday = (i == todayDow)
                         )
-                    },
-                    yAxisLabels = listOf("$maxNotif", "${(maxNotif * 2) / 3}", "${maxNotif / 3}"),
-                    valueExtractor = { it.notifications.toLong() },
-                    maxValue = maxNotif.toLong(),
-                    barColor = PrimeInfo
-                )
+                    }
+                if (notificationPoints.isNotEmpty()) {
+                    SingleColorBarChart(
+                        dataPoints = notificationPoints,
+                        yAxisLabels = listOf("$maxNotif", "${(maxNotif * 2) / 3}", "${maxNotif / 3}"),
+                        valueExtractor = { it.notifications.toLong() },
+                        maxValue = maxNotif.toLong(),
+                        barColor = PrimeInfo
+                    )
+                } else {
+                    Text("Notification event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(18.dp))
 
@@ -316,7 +322,7 @@ fun AppSpecificReportScreen(
         ) {
             Column {
                 Text(
-                    text = "${metric.dailyAvgAppOpens} activity resumes / day",
+                    text = if (metric.dailyAvgAppOpens < 0) "App-open data unavailable" else "${metric.dailyAvgAppOpens} app opens / day",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -326,29 +332,35 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${metric.weeklyAppOpens} activity resumes this week",
+                    text = if (metric.weeklyAppOpens < 0) "Android did not provide app-open event history" else "${metric.weeklyAppOpens} app opens this week",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                SingleColorBarChart(
-                    dataPoints = metric.dailyAppOpens.take(todayDow + 1).mapIndexed { i, count ->
-                        DayUsagePoint(
+                val appOpenPoints = metric.dailyAppOpens.take(todayDow + 1)
+                    .mapIndexedNotNull { i, count ->
+                        if (count < 0) null else DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
                             screenTimeMs = metric.dailyScreenTime.getOrElse(i) { 0L },
-                            notifications = metric.dailyNotifications.getOrElse(i) { 0 },
+                            notifications = metric.dailyNotifications.getOrElse(i) { -1 },
                             unlocks = count,
                             isToday = (i == todayDow)
                         )
-                    },
-                    yAxisLabels = listOf("$maxOpens", "${maxOpens / 2}"),
-                    valueExtractor = { it.unlocks.toLong() },
-                    maxValue = maxOpens.toLong(),
-                    barColor = PrimeInfo
-                )
+                    }
+                if (appOpenPoints.isNotEmpty()) {
+                    SingleColorBarChart(
+                        dataPoints = appOpenPoints,
+                        yAxisLabels = listOf("$maxOpens", "${maxOpens / 2}"),
+                        valueExtractor = { it.unlocks.toLong() },
+                        maxValue = maxOpens.toLong(),
+                        barColor = PrimeInfo
+                    )
+                } else {
+                    Text("App-open event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
             }
         }
 
