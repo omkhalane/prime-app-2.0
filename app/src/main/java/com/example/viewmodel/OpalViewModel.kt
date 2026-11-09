@@ -1034,6 +1034,7 @@ class OpalViewModel(
         stopwatchStartTime = System.currentTimeMillis()
         stopwatchBaseElapsed = 0L
         repository.saveStopwatchState(0L, true)
+        repository.saveStopwatchLaps(emptyList())
         _uiState.value = _uiState.value.copy(
             stopwatchState = _uiState.value.stopwatchState.copy(
                 isRunning = true,
