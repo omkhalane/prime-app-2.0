@@ -582,11 +582,11 @@ class WellbeingRepository(private val context: Context) {
             }
 
             dailyTimes.add(dayMs)
-            dailyOpens.add(if (dayStart > System.currentTimeMillis() || openCountAvailable) opens else -1)
+            dailyOpens.add(if (dayStart > System.currentTimeMillis() || dayMs == 0L || openCountAvailable) opens else -1)
             dailyNotifications.add(if (dayStart > System.currentTimeMillis() || notificationCountAvailable) notifications else -1)
             totalWeeklyMs += dayMs
             if (dayStart <= System.currentTimeMillis()) {
-                if (openCountAvailable) totalWeeklyOpens += opens else allOpenCountsAvailable = false
+                if (dayMs == 0L || openCountAvailable) totalWeeklyOpens += opens else allOpenCountsAvailable = false
                 if (notificationCountAvailable) totalWeeklyNotifications += notifications else allNotificationCountsAvailable = false
             }
         }
