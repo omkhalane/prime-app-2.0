@@ -410,7 +410,8 @@ class ExampleUnitTest {
         val quests = achievementRepo.dailyQuestsFlow.value
         assertEquals(3, quests.size)
         assertTrue(quests.none { it.isCompleted })
-        assertTrue(quests.all { it.currentProgress == 0 })
+        assertEquals(-1, quests.first { it.id == "quest_screen_time" }.currentProgress)
+        assertTrue(quests.filterNot { it.id == "quest_screen_time" }.all { it.currentProgress == 0 })
 
         val missions = achievementRepo.weeklyMissionsFlow.value
         assertEquals(3, missions.size)
