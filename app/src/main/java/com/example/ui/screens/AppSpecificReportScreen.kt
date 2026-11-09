@@ -357,7 +357,7 @@ fun AppSpecificReportScreen(
 }
 
 private fun rememberCurrentWeekRangeString(): String {
-    val cal = Calendar.getInstance()
+    val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
     val startDay = cal.get(Calendar.DAY_OF_MONTH)
     val startMonth = SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)
