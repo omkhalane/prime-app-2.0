@@ -491,7 +491,7 @@ class WellbeingRepository(private val context: Context) {
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
                         if (event.packageName == packageName) {
-                            sawAppEvent = true {
+                            sawAppEvent = true
                             when (event.eventType) {
                                 UsageEvents.Event.ACTIVITY_RESUMED, 1 -> opens++
                                 12 -> notifications++
