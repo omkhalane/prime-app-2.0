@@ -951,40 +951,13 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun getTodayFocusMinutes(): Int {
-        val recorded = prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0
-        if (recorded > 0) return recorded
-        if (context == null) return 0
-
-        val screenMillis = _profileFlow.value.screenTimeMillis
-        val screenMin = (screenMillis / (1000 * 60)).toInt()
-        val targetMin = 180
-        return if (screenMin in 1..targetMin) {
-            val headroom = 1f - (screenMin.toFloat() / (targetMin * 1.5f)).coerceIn(0f, 1f)
-            (headroom * 80).toInt().coerceAtLeast(35)
-        } else if (screenMin > 0) {
-            25
-        } else {
-            0
-        }
+        // Only completed focus sessions are counted. Screen-time headroom is not focus time.
+        return (prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
     }
 
     fun getTodayBlockingMinutes(): Int {
-        val recorded = prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0
-        if (recorded > 0) return recorded
-        if (context == null) return 0
-
-        val activeRules = _rulesFlow.value.filter { !it.isPaused }
-        val blockedAppsCount = _appsFlow.value.count { it.isBlocked }
-        return if (activeRules.isNotEmpty() || blockedAppsCount > 0) {
-            val count = activeRules.size.coerceAtLeast(if (blockedAppsCount > 0) 1 else 0)
-            when {
-                count >= 2 -> 130
-                count == 1 -> 90
-                else -> 45
-            }
-        } else {
-            0
-        }
+        // Only measured blocking sessions are counted. Enabled rules are not elapsed minutes.
+        return (prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
     }
 
     fun addFocusMinutes(minutes: Int) {
