@@ -430,8 +430,8 @@ class OpalRepository(private val context: Context? = null) {
         syncAccessibilityBlockList()
     }
 
-    fun refreshRealScreenTime() {
-        if (context == null) return
+    fun refreshRealScreenTime(): RealScreenTimeTracker.TrackingResult? {
+        if (context == null) return null
         val currentWebsites = _appsFlow.value.filter { it.isWebsite }
         val currentBlockedIds = _appsFlow.value.filter { it.isBlocked }.map { it.id }.toSet()
 
@@ -467,6 +467,7 @@ class OpalRepository(private val context: Context? = null) {
             )
         }
         syncAccessibilityBlockList()
+        return trackingResult
     }
 
     fun logActivityAndBoostStreak() {
