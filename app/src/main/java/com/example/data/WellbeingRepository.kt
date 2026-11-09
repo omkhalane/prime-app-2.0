@@ -214,8 +214,8 @@ class WellbeingRepository(private val context: Context) {
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
-        } catch (_: Exception) {
-            // Android may not expose every event on every device.
+        } catch (e: Exception) {
+            return@withContext Result.failure(e)
         }
 
         val result = appMap.map { (pkg, duration) ->
