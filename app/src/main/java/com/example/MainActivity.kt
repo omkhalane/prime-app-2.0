@@ -568,6 +568,7 @@ fun OpalApp() {
                     PomodoroScreen(
                         state = uiState.pomodoroState,
                         settings = uiState.pomodoroSettings,
+                        themeId = uiState.clockPreferences.timerTheme,
                         onBack = { viewModel.closeTimerTool() },
                         onStart = { viewModel.startPomodoro() },
                         onPause = { viewModel.pausePomodoro() },
@@ -596,6 +597,7 @@ fun OpalApp() {
                         elapsedMillis = uiState.stopwatchState.elapsedMillis,
                         isRunning = uiState.stopwatchState.isRunning,
                         laps = uiState.stopwatchState.laps,
+                        themeId = uiState.clockPreferences.timerTheme,
                         onBack = { viewModel.closeTimerTool() },
                         onStart = { viewModel.startStopwatch() },
                         onPause = { viewModel.pauseStopwatch() },
