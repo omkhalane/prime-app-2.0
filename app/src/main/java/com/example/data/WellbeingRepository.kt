@@ -219,7 +219,7 @@ class WellbeingRepository(private val context: Context) {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    12 ->
+                    UsageEvents.Event.NOTIFICATION_INTERRUPTION ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
@@ -501,7 +501,7 @@ class WellbeingRepository(private val context: Context) {
                             sawAppEvent = true
                             when (event.eventType) {
                                 UsageEvents.Event.ACTIVITY_RESUMED, 1 -> opens++
-                                12 -> notifications++
+                                UsageEvents.Event.NOTIFICATION_INTERRUPTION -> notifications++
                             }
                         }
                     }
