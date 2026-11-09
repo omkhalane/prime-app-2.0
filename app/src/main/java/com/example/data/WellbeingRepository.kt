@@ -225,7 +225,7 @@ class WellbeingRepository(private val context: Context) {
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    UsageEvents.Event.NOTIFICATION_INTERRUPTION ->
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
@@ -427,7 +427,7 @@ class WellbeingRepository(private val context: Context) {
                         sawDailyEvent = true
                         val pkg = event.packageName
                         when (event.eventType) {
-                            UsageEvents.Event.NOTIFICATION_INTERRUPTION -> if (pkg != null &&
+                            USAGE_EVENT_NOTIFICATION_INTERRUPTION -> if (pkg != null &&
                                 !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                             ) dayNotifications++
                             UsageEvents.Event.KEYGUARD_HIDDEN -> dayUnlocks++
@@ -507,7 +507,7 @@ class WellbeingRepository(private val context: Context) {
                             sawAppEvent = true
                             when (event.eventType) {
                                 UsageEvents.Event.ACTIVITY_RESUMED -> opens++
-                                UsageEvents.Event.NOTIFICATION_INTERRUPTION -> notifications++
+                                USAGE_EVENT_NOTIFICATION_INTERRUPTION -> notifications++
                             }
                         }
                     }
