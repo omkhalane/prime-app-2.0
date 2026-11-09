@@ -243,10 +243,10 @@ fun WellbeingDailyDashboard(
 
                 if (trendPoints.isNotEmpty()) {
                     StackedBarChart(
-                        dataPoints = trendPoints,
+                        dataPoints = trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 },
                         yAxisLabels = listOf("8 h", "4 h"),
                         valueExtractor = { it.screenTimeMs },
-                        maxValue = (trendPoints.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
+                        maxValue = (trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
                     )
                 } else {
                     Text("Daily usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
