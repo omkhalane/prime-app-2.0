@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Build
 import com.example.model.BlockedAppItem
 import com.example.util.PermissionHelper
 import java.util.Calendar
@@ -285,6 +286,26 @@ object RealScreenTimeTracker {
     }
 
     fun getDigitalWellbeingCategory(context: Context, pkg: String, name: String): String {
+        // Android's declared app category is more reliable than matching words
+        // such as "social", "video" or "browser" in a label/package name.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val platformCategory = try {
+                context.packageManager.getApplicationInfo(pkg, 0).category
+            } catch (_: Exception) {
+                ApplicationInfo.CATEGORY_UNDEFINED
+            }
+            when (platformCategory) {
+                ApplicationInfo.CATEGORY_GAME -> return "Games"
+                ApplicationInfo.CATEGORY_AUDIO -> return "Audio"
+                ApplicationInfo.CATEGORY_VIDEO -> return "Video"
+                ApplicationInfo.CATEGORY_IMAGE -> return "Photos"
+                ApplicationInfo.CATEGORY_SOCIAL -> return "Social"
+                ApplicationInfo.CATEGORY_NEWS -> return "News"
+                ApplicationInfo.CATEGORY_MAPS -> return "Maps"
+                ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "Productivity"
+                ApplicationInfo.CATEGORY_ACCESSIBILITY -> return "Accessibility"
+            }
+        }
         val lower = (name + " " + pkg).lowercase()
         return when {
             lower.contains("instagram") ||
