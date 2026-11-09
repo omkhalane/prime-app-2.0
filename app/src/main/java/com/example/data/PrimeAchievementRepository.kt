@@ -202,7 +202,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
             when (quest.id) {
                 "quest_screen_time" -> quest.copy(
                     description = "Keep phone usage below $screenTarget min today",
-                    currentProgress = screenMinutes ?: 0,
+                    currentProgress = screenMinutes ?: -1,
                     targetProgress = screenTarget,
                     isCompleted = screenMinutes != null && screenMinutes <= screenTarget
                 )
@@ -242,7 +242,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 id = "quest_screen_time",
                 title = "Screen Time Control",
                 description = "Keep phone usage below ${_targetsFlow.value.screenTimeTargetMinutes} min today",
-                currentProgress = 0,
+                currentProgress = -1,
                 targetProgress = _targetsFlow.value.screenTimeTargetMinutes,
                 unit = "min",
                 xpReward = 50,
