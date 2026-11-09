@@ -386,7 +386,7 @@ class WellbeingRepository(private val context: Context) {
 
         val points = mutableListOf<DayUsagePoint>()
 
-        for (dow in 0..6) {
+        for (dow in 0..todayDow) {
             val cal = Calendar.getInstance().apply {
                 firstDayOfWeek = Calendar.SUNDAY
                 set(Calendar.DAY_OF_WEEK, dow + 1)
