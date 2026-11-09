@@ -211,7 +211,7 @@ fun ClockSettingsSheet(
                 Text("Alarm wallpaper", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
             Spacer(Modifier.height(9.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 alarmWallpapers.forEach { theme ->
                     ThemeSwatch(theme, value.alarmWallpaper == theme.id) { value = value.copy(alarmWallpaper = theme.id) }
                 }
@@ -220,7 +220,7 @@ fun ClockSettingsSheet(
             Spacer(Modifier.height(18.dp))
             Text("Timer colour theme", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             Spacer(Modifier.height(9.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 timerThemes.forEach { theme ->
                     ThemeSwatch(theme, value.timerTheme == theme.id) { value = value.copy(timerTheme = theme.id) }
                 }
