@@ -364,7 +364,8 @@ class ExampleUnitTest {
             actualScreenMinutes = 150,
             verifiedFocusMinutes = 90,
             verifiedBlockedMinutes = 120,
-            targets = targets
+            targets = targets,
+            hasPermission = true
         )
         assertEquals(796, fullBreakdown.totalScore)
         assertEquals(com.example.model.PrimeRankTier.ELITE, fullBreakdown.currentRank)
