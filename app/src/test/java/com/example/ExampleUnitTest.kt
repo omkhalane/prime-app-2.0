@@ -258,22 +258,29 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun testTimerSessionAppBlockingAndAutoUnblocking() {
+    fun testTimerSessionAppBlockingSurvivesDashboardRefreshAndAutoUnblocks() {
         val repo = OpalRepository()
-        // Baseline sync
         repo.syncAccessibilityBlockList()
         val initialBlocked = OpalAccessibilityService.blockedPackages.toSet()
 
-        // Apply a temporary timer session package
         val tempPackage = "com.temp.focus.session"
         repo.applyTimerSessionAppBlock(setOf(tempPackage))
         assertTrue(OpalAccessibilityService.blockedPackages.contains(tempPackage))
         assertTrue(OpalAccessibilityService.isBlockingActive)
 
-        // Clear session block (simulating timer finished or stopped)
+        // A profile/dashboard refresh must not erase temporary timer rules.
+        repo.syncAccessibilityBlockList()
+        assertTrue(OpalAccessibilityService.blockedPackages.contains(tempPackage))
+
         repo.clearTimerSessionAppBlock()
         assertFalse(OpalAccessibilityService.blockedPackages.contains(tempPackage))
         assertEquals(initialBlocked, OpalAccessibilityService.blockedPackages)
+    }
+
+    @Test
+    fun testBlockingMinutesAreZeroUntilEnforcementUptimeIsMeasured() {
+        val repo = OpalRepository()
+        assertEquals(0, repo.getTodayBlockingMinutes())
     }
 
     @Test
@@ -357,7 +364,8 @@ class ExampleUnitTest {
             actualScreenMinutes = 150,
             verifiedFocusMinutes = 90,
             verifiedBlockedMinutes = 120,
-            targets = targets
+            targets = targets,
+            hasPermission = true
         )
         assertEquals(796, fullBreakdown.totalScore)
         assertEquals(com.example.model.PrimeRankTier.ELITE, fullBreakdown.currentRank)
@@ -398,17 +406,40 @@ class ExampleUnitTest {
         assertEquals(42, badges.size) // 36 core badges + 6 rare/special badges
 
         val unlockedBadges = badges.filter { it.isUnlocked }
-        assertEquals(12, unlockedBadges.size) // 12 unlocked out of 42 (28.6%)
+        assertEquals(0, unlockedBadges.size) // No demo badges are pre-unlocked.
 
         val quests = achievementRepo.dailyQuestsFlow.value
         assertEquals(3, quests.size)
+        assertTrue(quests.none { it.isCompleted })
+        assertEquals(-1, quests.first { it.id == "quest_screen_time" }.currentProgress)
+        assertTrue(quests.filterNot { it.id == "quest_screen_time" }.all { it.currentProgress == 0 })
 
         val missions = achievementRepo.weeklyMissionsFlow.value
         assertEquals(3, missions.size)
+        assertTrue(missions.none { it.isCompleted })
+        assertTrue(missions.all { it.currentProgress == 0 })
 
         val progression = achievementRepo.progressionFlow.value
         assertTrue(progression.primeLevel >= 1)
-        assertTrue(progression.totalXp > 0)
+        assertEquals(0, progression.totalXp)
+    }
+
+    @Test
+    fun testAchievementQuestsUseMeasuredProgressOnly() {
+        val achievementRepo = com.example.data.PrimeAchievementRepository()
+        achievementRepo.updateDailyProgress(
+            screenMinutes = null,
+            completedPomodoroSessions = 2,
+            blockingMinutes = 60
+        )
+        val quests = achievementRepo.dailyQuestsFlow.value.associateBy { it.id }
+        assertFalse(quests.getValue("quest_screen_time").isCompleted)
+        assertTrue(quests.getValue("quest_pomodoro").isCompleted)
+        assertTrue(quests.getValue("quest_blocking").isCompleted)
+
+        achievementRepo.updateWeeklyFocusProgress(10)
+        assertTrue(achievementRepo.weeklyMissionsFlow.value
+            .first { it.id == "mission_focus_sessions" }.isCompleted)
     }
 
     // ==================== WEBSITE BLOCKER DNS & MATCHER TESTS ====================

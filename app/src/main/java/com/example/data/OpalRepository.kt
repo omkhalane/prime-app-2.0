@@ -33,6 +33,8 @@ class OpalRepository(private val context: Context? = null) {
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
+    // Temporary timer-session targets must survive normal dashboard refreshes.
+    private var timerSessionBlockedPackages: Set<String> = emptySet()
 
     // Initial default rules (can be edited/saved by user)
     private val defaultRules = listOf(
@@ -430,8 +432,8 @@ class OpalRepository(private val context: Context? = null) {
         syncAccessibilityBlockList()
     }
 
-    fun refreshRealScreenTime() {
-        if (context == null) return
+    fun refreshRealScreenTime(): RealScreenTimeTracker.TrackingResult? {
+        if (context == null) return null
         val currentWebsites = _appsFlow.value.filter { it.isWebsite }
         val currentBlockedIds = _appsFlow.value.filter { it.isBlocked }.map { it.id }.toSet()
 
@@ -445,30 +447,29 @@ class OpalRepository(private val context: Context? = null) {
 
         val streakInfo = StreakTracker.getStreakInfo(context)
 
-        if (trackingResult.apps.isNotEmpty()) {
-            val categoryOverrides = getSavedCategoryOverrides()
-            val appsWithOverrides = trackingResult.apps.map { app ->
-                val overridden = categoryOverrides[app.id]
-                if (overridden != null) app.copy(category = overridden) else app
-            }
-            _appsFlow.value = appsWithOverrides
-            _profileFlow.update {
-                it.copy(
-                    screenTimeToday = trackingResult.totalScreenTimeFormatted,
-                    screenTimeMillis = trackingResult.totalScreenTimeMillis,
-                    score = trackingResult.score,
-                    sleepScore = trackingResult.sleepScore,
-                    focusScore = trackingResult.focusScore,
-                    restScore = trackingResult.restScore,
-                    streakDays = streakInfo.currentStreak,
-                    bestStreakDays = streakInfo.bestStreak,
-                    isActiveToday = streakInfo.isActiveToday,
-                    weekDaysActive = streakInfo.weekDaysActive,
-                    hasUsagePermission = trackingResult.hasUsagePermission
-                )
-            }
+        val categoryOverrides = getSavedCategoryOverrides()
+        val appsWithOverrides = trackingResult.apps.map { app ->
+            val overridden = categoryOverrides[app.id]
+            if (overridden != null) app.copy(category = overridden) else app
+        }
+        _appsFlow.value = appsWithOverrides
+        _profileFlow.update {
+            it.copy(
+                screenTimeToday = trackingResult.totalScreenTimeFormatted,
+                screenTimeMillis = trackingResult.totalScreenTimeMillis,
+                score = trackingResult.score,
+                sleepScore = trackingResult.sleepScore,
+                focusScore = trackingResult.focusScore,
+                restScore = trackingResult.restScore,
+                streakDays = streakInfo.currentStreak,
+                bestStreakDays = streakInfo.bestStreak,
+                isActiveToday = streakInfo.isActiveToday,
+                weekDaysActive = streakInfo.weekDaysActive,
+                hasUsagePermission = trackingResult.hasUsagePermission
+            )
         }
         syncAccessibilityBlockList()
+        return trackingResult
     }
 
     fun logActivityAndBoostStreak() {
@@ -666,28 +667,29 @@ class OpalRepository(private val context: Context? = null) {
             .toSet()
 
         val activeRulesCount = _rulesFlow.value.count { !it.isPaused }
-        OpalAccessibilityService.blockedPackages = blockedPackageNames
+        val effectiveBlockedPackages = blockedPackageNames + timerSessionBlockedPackages
+        OpalAccessibilityService.blockedPackages = effectiveBlockedPackages
         if (blockedWebsiteDomains.isNotEmpty()) {
             val combinedWebsites = OpalAccessibilityService.blockedWebsites + blockedWebsiteDomains
             OpalAccessibilityService.updateBlockedWebsites(combinedWebsites)
         }
         OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
-                blockedPackageNames.isNotEmpty() ||
+                effectiveBlockedPackages.isNotEmpty() ||
                 OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        context?.let { ctx ->
+            try {
+                com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
+            } catch (_: Exception) { }
+        }
     }
 
     fun applyTimerSessionAppBlock(sessionPackageNames: Set<String>) {
-        val baseBlockedPackages = _appsFlow.value
-            .filter { it.isBlocked && !it.isWebsite && it.packageName.isNotBlank() }
-            .map { it.packageName }
-            .toSet()
-
-        val combinedBlocked = baseBlockedPackages + sessionPackageNames
-        OpalAccessibilityService.blockedPackages = combinedBlocked
-        OpalAccessibilityService.isBlockingActive = combinedBlocked.isNotEmpty() || OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        timerSessionBlockedPackages = sessionPackageNames
+        syncAccessibilityBlockList()
     }
 
     fun clearTimerSessionAppBlock() {
+        timerSessionBlockedPackages = emptySet()
         syncAccessibilityBlockList()
     }
 
@@ -951,51 +953,67 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun getTodayFocusMinutes(): Int {
-        val recorded = prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0
-        if (recorded > 0) return recorded
-        if (context == null) return 0
-
-        val screenMillis = _profileFlow.value.screenTimeMillis
-        val screenMin = (screenMillis / (1000 * 60)).toInt()
-        val targetMin = 180
-        return if (screenMin in 1..targetMin) {
-            val headroom = 1f - (screenMin.toFloat() / (targetMin * 1.5f)).coerceIn(0f, 1f)
-            (headroom * 80).toInt().coerceAtLeast(35)
-        } else if (screenMin > 0) {
-            25
-        } else {
-            0
-        }
+        // Only completed focus sessions are counted. Screen-time headroom is not focus time.
+        return (prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
     }
 
     fun getTodayBlockingMinutes(): Int {
-        val recorded = prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0
-        if (recorded > 0) return recorded
-        if (context == null) return 0
-
-        val activeRules = _rulesFlow.value.filter { !it.isPaused }
-        val blockedAppsCount = _appsFlow.value.count { it.isBlocked }
-        return if (activeRules.isNotEmpty() || blockedAppsCount > 0) {
-            val count = activeRules.size.coerceAtLeast(if (blockedAppsCount > 0) 1 else 0)
-            when {
-                count >= 2 -> 130
-                count == 1 -> 90
-                else -> 45
-            }
-        } else {
-            0
+        // Flush the live interval so dashboard reads do not lag behind the 15-second checkpoint.
+        context?.let { ctx ->
+            try {
+                com.example.vpn.service.BlockingManager.getInstance(ctx).flushBlockingDuration()
+            } catch (_: Exception) { }
         }
+        // Milliseconds are accumulated only while a real enforcement service is active
+        // with at least one configured app or website target.
+        val measuredMillis = prefs?.getLong("verified_block_ms_${getTodayDateKey()}", 0L) ?: 0L
+        return (measuredMillis.coerceAtLeast(0L) / 60_000L).toInt()
     }
 
-    fun addFocusMinutes(minutes: Int) {
+    fun addFocusMinutes(minutes: Int, isPomodoro: Boolean = false) {
         if (minutes <= 0) return
-        val current = prefs?.getInt("verified_focus_min_${getTodayDateKey()}", 0) ?: 0
-        prefs?.edit()?.putInt("verified_focus_min_${getTodayDateKey()}", current + minutes)?.apply()
+        val dateKey = getTodayDateKey()
+        val currentMinutes = prefs?.getInt("verified_focus_min_$dateKey", 0) ?: 0
+        val currentSessions = prefs?.getInt("verified_focus_sessions_$dateKey", 0) ?: 0
+        val editor = prefs?.edit()
+            ?.putInt("verified_focus_min_$dateKey", currentMinutes + minutes)
+            ?.putInt("verified_focus_sessions_$dateKey", currentSessions + 1)
+
+        if (isPomodoro) {
+            val currentPomodoros = prefs?.getInt("verified_pomodoro_sessions_$dateKey", 0) ?: 0
+            val currentPomodoroMinutes = prefs?.getInt("verified_pomodoro_min_$dateKey", 0) ?: 0
+            editor?.putInt("verified_pomodoro_sessions_$dateKey", currentPomodoros + 1)
+                ?.putInt("verified_pomodoro_min_$dateKey", currentPomodoroMinutes + minutes)
+        }
+        editor?.apply()
     }
 
-    fun addBlockingMinutes(minutes: Int) {
-        if (minutes <= 0) return
-        val current = prefs?.getInt("verified_block_min_${getTodayDateKey()}", 0) ?: 0
-        prefs?.edit()?.putInt("verified_block_min_${getTodayDateKey()}", current + minutes)?.apply()
+    fun getTodayFocusSessions(): Int =
+        (prefs?.getInt("verified_focus_sessions_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
+
+    fun getTodayPomodoroSessions(): Int =
+        (prefs?.getInt("verified_pomodoro_sessions_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
+
+    fun getWeekFocusSessions(): Int {
+        val calendar = java.util.Calendar.getInstance().apply {
+            firstDayOfWeek = java.util.Calendar.SUNDAY
+            set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SUNDAY)
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val today = java.util.Calendar.getInstance()
+        val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        var total = 0
+        while (calendar.timeInMillis <= today.timeInMillis) {
+            val dateKey = formatter.format(calendar.time)
+            total += prefs?.getInt("verified_focus_sessions_$dateKey", 0) ?: 0
+            calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        }
+        return total.coerceAtLeast(0)
     }
+
+    // Blocking time is recorded by BlockingManager from actual enforcement uptime.
+    // Do not manually add estimated minutes here.
 }

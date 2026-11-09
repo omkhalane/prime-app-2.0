@@ -189,13 +189,13 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyScreenTime.mapIndexed { i, time ->
+                    dataPoints = metric.dailyScreenTime.take(todayDow + 1).mapIndexed { i, time ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
                             screenTimeMs = time,
-                            notifications = 0,
-                            unlocks = 0,
+                            notifications = metric.dailyNotifications.getOrElse(i) { 0 },
+                            unlocks = metric.dailyAppOpens.getOrElse(i) { 0 },
                             isToday = (i == todayDow)
                         )
                     },
@@ -244,7 +244,7 @@ fun AppSpecificReportScreen(
         ) {
             Column {
                 Text(
-                    text = "${metric.dailyAvgNotifications} notifications / day",
+                    text = "${metric.dailyAvgNotifications} notification interruptions / day",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -254,7 +254,7 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${metric.weeklyNotifications} notifications total this week",
+                    text = "${metric.weeklyNotifications} notification interruptions this week",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
@@ -262,13 +262,13 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyNotifications.mapIndexed { i, count ->
+                    dataPoints = metric.dailyNotifications.take(todayDow + 1).mapIndexed { i, count ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
-                            screenTimeMs = 0L,
+                            screenTimeMs = metric.dailyScreenTime.getOrElse(i) { 0L },
                             notifications = count,
-                            unlocks = 0,
+                            unlocks = metric.dailyAppOpens.getOrElse(i) { 0 },
                             isToday = (i == todayDow)
                         )
                     },
@@ -316,7 +316,7 @@ fun AppSpecificReportScreen(
         ) {
             Column {
                 Text(
-                    text = "${metric.dailyAvgAppOpens} app opens / day",
+                    text = "${metric.dailyAvgAppOpens} activity resumes / day",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -326,7 +326,7 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${metric.weeklyAppOpens} app opens total this week",
+                    text = "${metric.weeklyAppOpens} activity resumes this week",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
@@ -334,12 +334,12 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyAppOpens.mapIndexed { i, count ->
+                    dataPoints = metric.dailyAppOpens.take(todayDow + 1).mapIndexed { i, count ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
-                            screenTimeMs = 0L,
-                            notifications = 0,
+                            screenTimeMs = metric.dailyScreenTime.getOrElse(i) { 0L },
+                            notifications = metric.dailyNotifications.getOrElse(i) { 0 },
                             unlocks = count,
                             isToday = (i == todayDow)
                         )
@@ -357,7 +357,7 @@ fun AppSpecificReportScreen(
 }
 
 private fun rememberCurrentWeekRangeString(): String {
-    val cal = Calendar.getInstance()
+    val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
     val startDay = cal.get(Calendar.DAY_OF_MONTH)
     val startMonth = SimpleDateFormat("MMMM", Locale.getDefault()).format(cal.time)

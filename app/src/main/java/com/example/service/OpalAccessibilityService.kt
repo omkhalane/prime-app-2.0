@@ -169,6 +169,9 @@ class OpalAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         isServiceRunning = true
+        try {
+            BlockingManager.getInstance(applicationContext).onAccessibilityServiceStateChanged()
+        } catch (_: Exception) { }
         safeLog(Log.INFO, TAG, "PRIME Accessibility Service connected successfully")
     }
 
@@ -377,5 +380,8 @@ class OpalAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         isServiceRunning = false
+        try {
+            BlockingManager.getInstance(applicationContext).onAccessibilityServiceStateChanged()
+        } catch (_: Exception) { }
     }
 }

@@ -66,6 +66,21 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     private fun loadBadges(): List<PrimeBadge> {
+        // The previous quest flow shipped with demo-completed quests and allowed
+        // claims without checking completion. Its stored XP/claim history is not verifiable.
+        if (prefs?.getBoolean("seeded_achievement_cleanup_v2", false) != true) {
+            val editor = prefs?.edit()
+                ?.putInt("bonus_xp", 0)
+                ?.putBoolean("seeded_achievement_cleanup_v2", true)
+            prefs?.all?.keys.orEmpty()
+                .filter {
+                    it.startsWith("claimed_daily_quests_") ||
+                        it.startsWith("claimed_weekly_missions_")
+                }
+                .forEach { editor?.remove(it) }
+            editor?.apply()
+        }
+
         val unlockedJson = prefs?.getString("unlocked_badges_set", null)
         val unlockedMap = mutableMapOf<String, String>() // id to date
         if (unlockedJson != null) {
@@ -76,6 +91,23 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                     unlockedMap[obj.getString("id")] = obj.optString("date", "Unlocked")
                 }
             } catch (_: Exception) {}
+        }
+
+        // These IDs were pre-unlocked by the old demo seed, not by verified user activity.
+        if (prefs?.getBoolean("seeded_badge_cleanup_v1", false) != true) {
+            val seededIds = setOf(
+                "time_guardian", "screen_slayer", "time_reclaimer",
+                "focus_hunter", "deep_thinker", "unbreakable_focus",
+                "shield_bearer", "distraction_destroyer", "iron_will",
+                "spark", "pomodoro_rookie", "flow_state"
+            )
+            seededIds.forEach { unlockedMap.remove(it) }
+            val cleaned = JSONArray()
+            unlockedMap.forEach { (id, date) ->
+                cleaned.put(JSONObject().apply { put("id", id); put("date", date) })
+            }
+            prefs?.edit()?.putString("unlocked_badges_set", cleaned.toString())
+                ?.putBoolean("seeded_badge_cleanup_v1", true)?.apply()
         }
 
         val baseList = generateAllBadges()
@@ -105,6 +137,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     fun pinBadgeToFavorite(badgeId: String) {
+        if (_badgesFlow.value.none { it.id == badgeId && it.isUnlocked }) return
         val current = _progressionFlow.value.pinnedBadgeIds.toMutableList()
         if (current.contains(badgeId)) {
             current.remove(badgeId)
@@ -137,107 +170,161 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     fun claimDailyQuest(questId: String) {
+        val quest = _dailyQuestsFlow.value.firstOrNull {
+            it.id == questId && it.isCompleted && !it.isClaimed
+        } ?: return
         val updated = _dailyQuestsFlow.value.map {
-            if (it.id == questId && it.isCompleted && !it.isClaimed) {
-                it.copy(isClaimed = true)
-            } else it
+            if (it.id == questId) it.copy(isClaimed = true) else it
         }
         _dailyQuestsFlow.value = updated
-        val quest = updated.find { it.id == questId }
-        if (quest != null) {
-            val curXp = prefs?.getInt("bonus_xp", 450) ?: 450
-            prefs?.edit()?.putInt("bonus_xp", curXp + quest.xpReward)?.apply()
-            _progressionFlow.value = calculateProgression(_badgesFlow.value)
-        }
+        val key = "claimed_daily_quests_${todayKey()}"
+        val claimed = prefs?.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        claimed.add(questId)
+        val curXp = prefs?.getInt("bonus_xp", 0) ?: 0
+        prefs?.edit()?.putStringSet(key, claimed)?.putInt("bonus_xp", curXp + quest.xpReward)?.apply()
+        _progressionFlow.value = calculateProgression(_badgesFlow.value)
     }
 
     fun claimWeeklyMission(missionId: String) {
+        val mission = _weeklyMissionsFlow.value.firstOrNull {
+            it.id == missionId && it.isCompleted && !it.isClaimed
+        } ?: return
         val updated = _weeklyMissionsFlow.value.map {
-            if (it.id == missionId && it.isCompleted && !it.isClaimed) {
-                it.copy(isClaimed = true)
-            } else it
+            if (it.id == missionId) it.copy(isClaimed = true) else it
         }
         _weeklyMissionsFlow.value = updated
-        val mission = updated.find { it.id == missionId }
-        if (mission != null) {
-            val curXp = prefs?.getInt("bonus_xp", 450) ?: 450
-            prefs?.edit()?.putInt("bonus_xp", curXp + mission.xpReward)?.apply()
-            _progressionFlow.value = calculateProgression(_badgesFlow.value)
+        val key = "claimed_weekly_missions_${weekKey()}"
+        val claimed = prefs?.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        claimed.add(missionId)
+        val curXp = prefs?.getInt("bonus_xp", 0) ?: 0
+        prefs?.edit()?.putStringSet(key, claimed)?.putInt("bonus_xp", curXp + mission.xpReward)?.apply()
+        _progressionFlow.value = calculateProgression(_badgesFlow.value)
+    }
+
+    private fun todayKey(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    private fun weekKey(): String {
+        val calendar = java.util.Calendar.getInstance().apply {
+            firstDayOfWeek = java.util.Calendar.SUNDAY
+            set(java.util.Calendar.DAY_OF_WEEK, java.util.Calendar.SUNDAY)
         }
+        return SimpleDateFormat("yyyy-'W'ww", Locale.US).format(calendar.time)
+    }
+
+    fun updateDailyProgress(screenMinutes: Int?, completedPomodoroSessions: Int, blockingMinutes: Int) {
+        val screenTarget = _targetsFlow.value.screenTimeTargetMinutes
+        val updated = _dailyQuestsFlow.value.map { quest ->
+            when (quest.id) {
+                "quest_screen_time" -> quest.copy(
+                    description = "Keep phone usage below $screenTarget min today",
+                    currentProgress = screenMinutes ?: -1,
+                    targetProgress = screenTarget,
+                    isCompleted = screenMinutes != null && screenMinutes <= screenTarget
+                )
+                "quest_pomodoro" -> quest.copy(
+                    currentProgress = completedPomodoroSessions.coerceAtLeast(0),
+                    targetProgress = 2,
+                    isCompleted = completedPomodoroSessions >= 2
+                )
+                "quest_blocking" -> quest.copy(
+                    currentProgress = blockingMinutes.coerceAtLeast(0),
+                    targetProgress = 60,
+                    isCompleted = blockingMinutes >= 60
+                )
+                else -> quest
+            }
+        }
+        _dailyQuestsFlow.value = updated
+    }
+
+    fun updateWeeklyFocusProgress(completedFocusSessions: Int) {
+        val updated = _weeklyMissionsFlow.value.map { mission ->
+            if (mission.id == "mission_focus_sessions") {
+                mission.copy(
+                    currentProgress = completedFocusSessions.coerceAtLeast(0),
+                    targetProgress = 10,
+                    isCompleted = completedFocusSessions >= 10
+                )
+            } else mission
+        }
+        _weeklyMissionsFlow.value = updated
     }
 
     private fun loadDailyQuests(): List<DailyQuest> {
+        val claimedIds = prefs?.getStringSet("claimed_daily_quests_${todayKey()}", mutableSetOf()).orEmpty()
         return listOf(
             DailyQuest(
                 id = "quest_screen_time",
                 title = "Screen Time Control",
-                description = "Keep phone usage below 180 min today",
-                currentProgress = 150,
-                targetProgress = 180,
+                description = "Keep phone usage below ${_targetsFlow.value.screenTimeTargetMinutes} min today",
+                currentProgress = -1,
+                targetProgress = _targetsFlow.value.screenTimeTargetMinutes,
                 unit = "min",
                 xpReward = 50,
-                isCompleted = true,
-                isClaimed = false
+                isCompleted = false,
+                isClaimed = claimedIds.contains("quest_screen_time")
             ),
             DailyQuest(
                 id = "quest_pomodoro",
                 title = "Double Pomodoro",
                 description = "Complete 2 verified Pomodoro rounds",
-                currentProgress = 2,
+                currentProgress = 0,
                 targetProgress = 2,
                 unit = "rounds",
                 xpReward = 60,
-                isCompleted = true,
-                isClaimed = false
+                isCompleted = false,
+                isClaimed = claimedIds.contains("quest_pomodoro")
             ),
             DailyQuest(
                 id = "quest_blocking",
                 title = "Shield Wall",
                 description = "Maintain active shields for 60 minutes",
-                currentProgress = 60,
+                currentProgress = 0,
                 targetProgress = 60,
                 unit = "min",
                 xpReward = 50,
-                isCompleted = true,
-                isClaimed = false
+                isCompleted = false,
+                isClaimed = claimedIds.contains("quest_blocking")
             )
         )
     }
 
     private fun loadWeeklyMissions(): List<WeeklyMission> {
+        val claimedIds = prefs?.getStringSet("claimed_weekly_missions_${weekKey()}", mutableSetOf()).orEmpty()
         return listOf(
             WeeklyMission(
                 id = "mission_elite_avg",
                 title = "Elite Standard",
                 description = "Achieve 700+ weekly average PRIME score",
-                currentProgress = 742,
+                currentProgress = 0,
                 targetProgress = 700,
                 unit = "score",
                 xpReward = 150,
-                isCompleted = true,
-                isClaimed = false
+                isCompleted = false,
+                isClaimed = claimedIds.contains("mission_elite_avg")
             ),
             WeeklyMission(
                 id = "mission_focus_sessions",
                 title = "Deep Focus Habit",
                 description = "Complete 10 focused sessions this week",
-                currentProgress = 7,
+                currentProgress = 0,
                 targetProgress = 10,
                 unit = "sessions",
                 xpReward = 120,
                 isCompleted = false,
-                isClaimed = false
+                isClaimed = claimedIds.contains("mission_focus_sessions")
             ),
             WeeklyMission(
                 id = "mission_reclaim_hours",
                 title = "Time Liberator",
                 description = "Reclaim 3 hours against your baseline",
-                currentProgress = 3,
+                currentProgress = 0,
                 targetProgress = 3,
                 unit = "hours",
                 xpReward = 150,
-                isCompleted = true,
-                isClaimed = false
+                isCompleted = false,
+                isClaimed = claimedIds.contains("mission_reclaim_hours")
             )
         )
     }
@@ -245,7 +332,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     private fun calculateProgression(badges: List<PrimeBadge>): PrimeProgression {
         val unlocked = badges.filter { it.isUnlocked }
         val badgeXp = unlocked.sumOf { it.xpValue }
-        val bonusXp = prefs?.getInt("bonus_xp", 450) ?: 450
+        val bonusXp = prefs?.getInt("bonus_xp", 0) ?: 0
         val totalXp = badgeXp + bonusXp
 
         val level = (1 + (totalXp / 400)).coerceAtLeast(1)
@@ -253,7 +340,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
         val xpForNext = 400
 
         val savedPinned = prefs?.getStringSet("pinned_badge_ids", null)
-            ?: setOf("time_guardian", "focus_hunter", "shield_bearer")
+            ?: emptySet()
+        val validPinned = savedPinned.filter { id -> unlocked.any { it.id == id } }.takeLast(3)
+        if (validPinned.toSet() != savedPinned) {
+            prefs?.edit()?.putStringSet("pinned_badge_ids", validPinned.toSet())?.apply()
+        }
 
         val totalCount = badges.size
         val unlockedCount = unlocked.size
@@ -264,7 +355,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
             primeLevel = level,
             currentLevelXp = currentLevelXp,
             xpForNextLevel = xpForNext,
-            pinnedBadgeIds = savedPinned.toList(),
+            pinnedBadgeIds = validPinned,
             totalBadgesCount = totalCount,
             unlockedBadgesCount = unlockedCount,
             completionPercentage = (completionPct * 10).roundToInt() / 10f
@@ -274,7 +365,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     /**
      * Exact 42 achievements:
      * 36 Core Badges (12 Categories A to L x 3 badges each) + 6 Special Rare Badges.
-     * Starts with exactly 12 unlocked badges (28.6% completion) matching the prompt.
+     * All badges start locked with zero progress; unlocks are earned from recorded activity.
      */
     private fun generateAllBadges(): List<PrimeBadge> {
         val list = mutableListOf<PrimeBadge>()
@@ -289,11 +380,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Stay within screen-time target for 3 days. (Next: Level II · 7 days)",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 7f,
                 unit = "days",
-                isUnlocked = true,
-                unlockedDate = "3 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "hourglass"
             )
         )
@@ -306,11 +397,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Reduce screen time by 10% against baseline. (Next: Level II · 20%)",
-                currentProgress = 14f,
+                currentProgress = 0f,
                 targetRequirement = 20f,
                 unit = "%",
-                isUnlocked = true,
-                unlockedDate = "4 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "phone"
             )
         )
@@ -323,11 +414,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Reclaim 5 hours against baseline. (Next: Level II · 20 hours)",
-                currentProgress = 11f,
+                currentProgress = 0f,
                 targetRequirement = 20f,
                 unit = "hrs",
-                isUnlocked = true,
-                unlockedDate = "1 week ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "bolt"
             )
         )
@@ -342,11 +433,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 focus sessions. (Next: Level II · 25 sessions)",
-                currentProgress = 12f,
+                currentProgress = 0f,
                 targetRequirement = 25f,
                 unit = "sessions",
-                isUnlocked = true,
-                unlockedDate = "4 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "target"
             )
         )
@@ -359,11 +450,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Accumulate 5 focus hours. (Next: Level II · 25 hours)",
-                currentProgress = 9.5f,
+                currentProgress = 0f,
                 targetRequirement = 25f,
                 unit = "hrs",
-                isUnlocked = true,
-                unlockedDate = "5 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "self_improvement"
             )
         )
@@ -376,11 +467,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.UNCOMMON,
                 xpValue = 250,
                 description = "Complete a 90-minute session. (Next: Level III · 120 min)",
-                currentProgress = 90f,
+                currentProgress = 0f,
                 targetRequirement = 120f,
                 unit = "min",
-                isUnlocked = true,
-                unlockedDate = "Yesterday",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "shield"
             )
         )
@@ -395,11 +486,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 successful blocking sessions. (Next: Level II · 25 sessions)",
-                currentProgress = 8f,
+                currentProgress = 0f,
                 targetRequirement = 25f,
                 unit = "sessions",
-                isUnlocked = true,
-                unlockedDate = "3 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "shield"
             )
         )
@@ -412,11 +503,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Block 3 apps or websites. (Next: Level II · 10)",
-                currentProgress = 6f,
+                currentProgress = 0f,
                 targetRequirement = 10f,
                 unit = "apps",
-                isUnlocked = true,
-                unlockedDate = "4 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "block"
             )
         )
@@ -429,11 +520,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 hours of successful protection. (Next: Level II · 25 hours)",
-                currentProgress = 14f,
+                currentProgress = 0f,
                 targetRequirement = 25f,
                 unit = "hrs",
-                isUnlocked = true,
-                unlockedDate = "2 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "lock"
             )
         )
@@ -448,11 +539,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Maintain a 3-day streak. (Next: Level II · 7 days)",
-                currentProgress = 5f,
+                currentProgress = 0f,
                 targetRequirement = 7f,
                 unit = "days",
-                isUnlocked = true,
-                unlockedDate = "3 days ago",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "bolt"
             )
         )
@@ -465,7 +556,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Reach a 21-day streak. (Next: Level II · 30 days)",
-                currentProgress = 5f,
+                currentProgress = 0f,
                 targetRequirement = 21f,
                 unit = "days",
                 iconType = "star"
@@ -480,7 +571,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.UNCOMMON,
                 xpValue = 100,
                 description = "Reach a 90-day streak. (Next: Level II · 180 days)",
-                currentProgress = 5f,
+                currentProgress = 0f,
                 targetRequirement = 90f,
                 unit = "days",
                 iconType = "star"
@@ -497,11 +588,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 4 Pomodoros. (Next: Level II · 25)",
-                currentProgress = 8f,
+                currentProgress = 0f,
                 targetRequirement = 25f,
                 unit = "rounds",
-                isUnlocked = true,
-                unlockedDate = "Yesterday",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "timer"
             )
         )
@@ -514,7 +605,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 Pomodoro hours. (Next: Level II · 25 hours)",
-                currentProgress = 3.5f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "hrs",
                 iconType = "timer"
@@ -529,11 +620,11 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 3 consecutive Pomodoros. (Next: Level II · 6)",
-                currentProgress = 3f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "rounds",
-                isUnlocked = true,
-                unlockedDate = "Yesterday",
+                isUnlocked = false,
+                unlockedDate = null,
                 iconType = "timer"
             )
         )
@@ -548,7 +639,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 1 hour offline. (Next: Level II · 5 hours)",
-                currentProgress = 2.5f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "hrs",
                 iconType = "park"
@@ -563,7 +654,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 3 detox sessions. (Next: Level II · 15)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "sessions",
                 iconType = "park"
@@ -578,7 +669,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete a 4-hour detox. (Next: Level II · 8 hours)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 4f,
                 unit = "hrs",
                 iconType = "self_improvement"
@@ -595,7 +686,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 3 morning phone-free routines. (Next: Level II · 14)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "routines",
                 iconType = "hourglass"
@@ -610,7 +701,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 3 phone-free bedtime routines. (Next: Level II · 14)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "routines",
                 iconType = "nightlight"
@@ -625,7 +716,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Maintain both morning and night routines for 3 days.",
-                currentProgress = 1f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "days",
                 iconType = "nightlight"
@@ -642,7 +733,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 goals. (Next: Level II · 25)",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "goals",
                 iconType = "target"
@@ -657,7 +748,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 3 daily plans. (Next: Level II · 14)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "plans",
                 iconType = "target"
@@ -672,7 +763,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Achieve 5 weekly goals. (Next: Level II · 20)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "goals",
                 iconType = "target"
@@ -689,7 +780,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 timer sessions. (Next: Level II · 25)",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "sessions",
                 iconType = "timer"
@@ -704,7 +795,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Accumulate 5 hours on timers. (Next: Level II · 25 hours)",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "hrs",
                 iconType = "timer"
@@ -719,7 +810,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 10 timer sessions without abandoning. (Next: Level II · 50)",
-                currentProgress = 7f,
+                currentProgress = 0f,
                 targetRequirement = 10f,
                 unit = "sessions",
                 iconType = "timer"
@@ -751,7 +842,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Meet all 3 daily targets for 3 days. (Next: Level II · 7)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "days",
                 iconType = "diamond"
@@ -766,7 +857,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Complete 5 mindful breaks. (Next: Level II · 25)",
-                currentProgress = 3f,
+                currentProgress = 0f,
                 targetRequirement = 5f,
                 unit = "breaks",
                 iconType = "self_improvement"
@@ -830,7 +921,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.COMMON,
                 xpValue = 100,
                 description = "Earn 3 days above 500 score. (Next: Level II · 7 days >600)",
-                currentProgress = 2f,
+                currentProgress = 0f,
                 targetRequirement = 3f,
                 unit = "days",
                 iconType = "star"
@@ -845,7 +936,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.UNCOMMON,
                 xpValue = 100,
                 description = "Reach a 7-day average of 600. (Next: Level II · 750)",
-                currentProgress = 540f,
+                currentProgress = 0f,
                 targetRequirement = 600f,
                 unit = "score",
                 iconType = "diamond"
@@ -860,7 +951,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.RARE,
                 xpValue = 100,
                 description = "Reach 900 weekly average score. (Next: Maintain 30 days)",
-                currentProgress = 742f,
+                currentProgress = 0f,
                 targetRequirement = 900f,
                 unit = "avg",
                 iconType = "diamond"
@@ -877,7 +968,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.RARE,
                 xpValue = 300,
                 description = "Complete your first 7 days on PRIME.",
-                currentProgress = 5f,
+                currentProgress = 0f,
                 targetRequirement = 7f,
                 unit = "days",
                 isSpecial = true,
@@ -893,7 +984,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.RARE,
                 xpValue = 300,
                 description = "Complete 7 consecutive days without breaking a scheduled protection session.",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 7f,
                 unit = "days",
                 isSpecial = true,
@@ -909,7 +1000,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.EPIC,
                 xpValue = 600,
                 description = "Reclaim 100 hours against personal baseline.",
-                currentProgress = 14f,
+                currentProgress = 0f,
                 targetRequirement = 100f,
                 unit = "hrs",
                 isSpecial = true,
@@ -925,7 +1016,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.LEGENDARY,
                 xpValue = 1000,
                 description = "Maintain a 100-day discipline streak.",
-                currentProgress = 5f,
+                currentProgress = 0f,
                 targetRequirement = 100f,
                 unit = "days",
                 isSpecial = true,
@@ -941,7 +1032,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                 rarity = BadgeRarity.LEGENDARY,
                 xpValue = 1000,
                 description = "Complete one verified 24-hour digital detox.",
-                currentProgress = 4f,
+                currentProgress = 0f,
                 targetRequirement = 24f,
                 unit = "hrs",
                 isSpecial = true,

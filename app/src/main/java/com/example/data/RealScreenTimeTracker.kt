@@ -1,6 +1,5 @@
 package com.example.data
 
-import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -109,15 +108,19 @@ object RealScreenTimeTracker {
         val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
+        var fetchError: String? = null
         val resolveInfos: List<ResolveInfo> = try {
             pm.queryIntentActivities(launcherIntent, 0)
         } catch (e: Exception) {
+            fetchError = "Unable to list launchable apps: ${e.message}"
             emptyList()
+        }
+        if (resolveInfos.isEmpty() && fetchError == null) {
+            fetchError = "Android did not return any launchable apps; screen-time totals are unavailable."
         }
 
         // 3. Query UsageStats strictly for Today (midnight to now)
         val usageStatsMap = mutableMapOf<String, Long>()
-        var fetchError: String? = null
 
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -134,73 +137,19 @@ object RealScreenTimeTracker {
                 // Primary: Authoritative aggregated stats from Android System
                 try {
                     val aggregated = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
-                    aggregated?.forEach { (pkg, stat) ->
-                        if (!isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
-                            usageStatsMap[pkg] = stat.totalTimeInForeground
-                        }
-                    }
-                } catch (_: Exception) {}
-
-                // Secondary: Precise event verification handling screen-off and lock
-                try {
-                    val events = usageStatsManager.queryEvents(startTime, endTime)
-                    val event = UsageEvents.Event()
-                    var currentResumedPkg: String? = null
-                    var currentResumedTime: Long = 0L
-
-                    while (events.hasNextEvent()) {
-                        events.getNextEvent(event)
-                        val pkg = event.packageName ?: continue
-                        val time = event.timeStamp
-                        if (time < startTime || time > endTime) continue
-
-                        val isIgnored = isIgnoredPackage(context, pkg, homePackages)
-
-                        when (event.eventType) {
-                            UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
-                                if (currentResumedPkg != null && currentResumedTime > 0 && currentResumedPkg != pkg) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                                    usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
-                                }
-                                if (!isIgnored) {
-                                    currentResumedPkg = pkg
-                                    currentResumedTime = time
-                                } else {
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
-                            }
-                            UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED, 2, 23 -> {
-                                if (currentResumedPkg == pkg && currentResumedTime > 0) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[pkg] ?: 0L
-                                    usageStatsMap[pkg] = maxOf(current, duration)
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
-                            }
-                            // SCREEN_NON_INTERACTIVE (16), KEYGUARD_SHOWN (17), DEVICE_SHUTDOWN (26)
-                            16, 17, 26 -> {
-                                if (currentResumedPkg != null && currentResumedTime > 0) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                                    usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
+                    if (aggregated == null) {
+                        fetchError = "Android returned no aggregated usage response."
+                    } else {
+                        aggregated.forEach { (pkg, stat) ->
+                            if (!isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
+                                usageStatsMap[pkg] = stat.totalTimeInForeground
                             }
                         }
-                    }
-
-                    if (currentResumedPkg != null && currentResumedTime > 0) {
-                        val duration = (endTime - currentResumedTime).coerceIn(0L, 10 * 60 * 1000L)
-                        val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                        usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
                     }
                 } catch (e: Exception) {
-                    fetchError = "Error querying usage events: ${e.message}"
+                    fetchError = "Unable to read Android usage statistics: ${e.message}"
                 }
+
             } else {
                 fetchError = "UsageStatsManager system service not available on device."
             }
@@ -224,18 +173,14 @@ object RealScreenTimeTracker {
 
             val usageMillis = usageStatsMap[pkg] ?: 0L
             val isAllowed = isAlwaysAllowedApp(appName, pkg)
-            val isKnownDistracting = !isAllowed && (isDistractingApp(appName, pkg) || true)
             val primeCategory = if (isAllowed) "Always allowed" else "Distracting"
             val wellbeingCategory = getDigitalWellbeingCategory(context, pkg, appName)
 
-            val isBlocked = if (existingBlockedIds.isNotEmpty()) {
-                existingBlockedIds.contains(pkg)
-            } else {
-                primeCategory == "Distracting"
-            }
+            val isBlocked = existingBlockedIds.contains(pkg)
 
             val usageText = when {
                 !hasPermission -> "Not tracked yet"
+                fetchError != null -> "Usage data unavailable"
                 usageMillis > 0 -> formatDuration(usageMillis) + " today"
                 else -> "Not used today"
             }
@@ -277,38 +222,29 @@ object RealScreenTimeTracker {
         }
 
         // Total screen time is strictly the sum of all foreground user apps used today (matching Digital Wellbeing)
-        val totalForegroundMillis = realAppItems.sumOf { it.usageMillis }
+        val totalForegroundMillis = if (fetchError == null) realAppItems.sumOf { it.usageMillis } else 0L
 
-        val formattedTotal = if (totalForegroundMillis > 0) {
-            formatDuration(totalForegroundMillis)
-        } else {
-            "0m"
+        val formattedTotal = when {
+            fetchError != null -> "Unavailable"
+            totalForegroundMillis > 0 -> formatDuration(totalForegroundMillis)
+            else -> "0m"
         }
 
         // 5. Calculate normalized PRIME score (0-1000 points)
         val minutesToday = (totalForegroundMillis / (1000 * 60)).toInt()
 
-        // Effective focus minutes: verified timer minutes, or mindful baseline when screen time is under control
-        val effectiveFocusMin = if (verifiedFocusMinutes > 0) {
-            verifiedFocusMinutes
-        } else {
-            if (minutesToday in 1..180) {
-                val ratio = 1f - (minutesToday.toFloat() / 270f).coerceIn(0f, 1f)
-                (ratio * 90).toInt().coerceAtLeast(35)
-            } else 40
-        }
+        // Only completed, verified sessions contribute to focus and blocking scores.
+        val effectiveFocusMin = verifiedFocusMinutes.coerceAtLeast(0)
+        val effectiveBlockedMin = verifiedBlockedMinutes.coerceAtLeast(0)
 
-        // Effective blocking minutes: verified blocked minutes, or active shield protection
-        val effectiveBlockedMin = if (verifiedBlockedMinutes > 0) {
-            verifiedBlockedMinutes
+        val screenTimeScore = if (fetchError == null) {
+            PrimeScoreCalculator.calculateScreenTimeScore(
+                actualMinutes = minutesToday,
+                targetMinutes = 180
+            )
         } else {
-            if (existingBlockedIds.isNotEmpty()) 120 else 60
+            0f
         }
-
-        val screenTimeScore = PrimeScoreCalculator.calculateScreenTimeScore(
-            actualMinutes = minutesToday,
-            targetMinutes = 180
-        )
         val focusScore = PrimeScoreCalculator.calculateFocusScore(
             verifiedFocusMinutes = effectiveFocusMin,
             targetFocusMinutes = 120

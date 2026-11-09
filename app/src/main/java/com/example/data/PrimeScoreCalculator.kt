@@ -72,7 +72,7 @@ object PrimeScoreCalculator {
         verifiedBlockedMinutes: Int,
         targets: PrimeTargets = PrimeTargets(),
         past7DayScores: List<Int> = emptyList(),
-        hasPermission: Boolean = true,
+        hasPermission: Boolean = false,
         errorMessage: String? = null
     ): PrimeScoreBreakdown {
         if (!hasPermission) {

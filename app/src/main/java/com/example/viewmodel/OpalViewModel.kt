@@ -43,6 +43,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 import android.os.SystemClock
 import com.example.alarm.AlarmSchedulerHelper
@@ -365,7 +367,6 @@ class OpalViewModel(
     }
 
     fun refreshRealScreenTime() {
-        repository.refreshRealScreenTime()
         refreshPermissions()
         refreshWellbeingData()
     }
@@ -373,21 +374,35 @@ class OpalViewModel(
     fun refreshWellbeingData() {
         val repo = wellbeingRepo ?: return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isWellbeingLoading = true)
-
-            if (!repo.hasUsageStatsPermission()) {
-                _uiState.value = _uiState.value.copy(
-                    isWellbeingLoading = false,
-                    screenTimePermissionGranted = false,
-                    wellbeingError = "Usage Access permission required to read device screen time and wellbeing analytics.",
+            _uiState.update {
+                it.copy(
+                    isWellbeingLoading = true,
+                    wellbeingError = null,
+                    todayAppUsage = emptyList(),
+                    todayCategoryUsage = emptyList(),
                     weeklyAppUsage = emptyList(),
                     categoryUsage = emptyList(),
                     hourlyPeakUsage = emptyList(),
                     dayUsagePoints = emptyList(),
                     weeklyHeatmap = emptyList()
                 )
+            }
+
+            if (!repo.hasUsageStatsPermission()) {
+                withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
+                refreshAchievementProgress(screenMinutes = null)
+                _uiState.update {
+                    it.copy(
+                        isWellbeingLoading = false,
+                        screenTimePermissionGranted = false,
+                        wellbeingError = "Usage Access permission is required to read device screen time and wellbeing analytics."
+                    )
+                }
                 return@launch
             }
+
+            // Keep the home/profile screen-time value in sync with the same refresh.
+            val trackerResult = withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
 
             val todayAppsResult = repo.getTodayAppUsage()
             val weeklyAppsResult = repo.getWeeklyAppUsage()
@@ -395,27 +410,53 @@ class OpalViewModel(
             val trendResult = repo.get7DayWeeklyTrend()
             val heatmapResult = repo.getWeeklyHeatmapMatrix()
 
-            val todayApps = todayAppsResult.getOrNull() ?: emptyList()
+            val todayApps = todayAppsResult.getOrNull().orEmpty()
+            val screenMinutes = todayAppsResult.getOrNull()?.sumOf { it.totalTimeMs }
+                ?.div(60_000L)?.toInt()
+            refreshAchievementProgress(screenMinutes)
+            val weeklyApps = weeklyAppsResult.getOrNull().orEmpty()
             val todayCategories = repo.getCategoryWiseUsage(todayApps)
-            val weeklyApps = weeklyAppsResult.getOrNull() ?: emptyList()
-            val categories = repo.getCategoryWiseUsage(weeklyApps)
-            val hourly = hourlyResult.getOrNull() ?: emptyList()
-            val trend = trendResult.getOrNull() ?: emptyList()
-            val heatmap = heatmapResult.getOrNull() ?: emptyList()
+            val weeklyCategories = repo.getCategoryWiseUsage(weeklyApps)
+            val hourly = hourlyResult.getOrNull().orEmpty()
+            val trend = trendResult.getOrNull().orEmpty()
+            val heatmap = heatmapResult.getOrNull().orEmpty()
 
-            _uiState.value = _uiState.value.copy(
-                isWellbeingLoading = false,
-                wellbeingError = null,
-                screenTimePermissionGranted = true,
-                todayAppUsage = todayApps,
-                todayCategoryUsage = todayCategories,
-                weeklyAppUsage = weeklyApps,
-                categoryUsage = categories,
-                hourlyPeakUsage = hourly,
-                dayUsagePoints = trend,
-                weeklyHeatmap = heatmap
-            )
+            val errors = listOf(
+                todayAppsResult.exceptionOrNull(),
+                weeklyAppsResult.exceptionOrNull(),
+                hourlyResult.exceptionOrNull(),
+                trendResult.exceptionOrNull(),
+                heatmapResult.exceptionOrNull()
+            ).filterNotNull()
+
+            val errorMessage = errors.firstOrNull()?.let { error ->
+                error.message ?: "Android usage statistics could not be read."
+            } ?: trackerResult?.errorMessage
+
+            _uiState.update {
+                it.copy(
+                    isWellbeingLoading = false,
+                    screenTimePermissionGranted = true,
+                    wellbeingError = errorMessage,
+                    todayAppUsage = todayApps,
+                    todayCategoryUsage = todayCategories,
+                    weeklyAppUsage = weeklyApps,
+                    categoryUsage = weeklyCategories,
+                    hourlyPeakUsage = hourly,
+                    dayUsagePoints = trend,
+                    weeklyHeatmap = heatmap
+                )
+            }
         }
+    }
+
+    private fun refreshAchievementProgress(screenMinutes: Int?) {
+        achievementRepo.updateDailyProgress(
+            screenMinutes = screenMinutes,
+            completedPomodoroSessions = repository.getTodayPomodoroSessions(),
+            blockingMinutes = repository.getTodayBlockingMinutes()
+        )
+        achievementRepo.updateWeeklyFocusProgress(repository.getWeekFocusSessions())
     }
 
     // Digital Wellbeing navigation
@@ -569,9 +610,6 @@ class OpalViewModel(
             repository.applyTimerSessionAppBlock(sessionPackages)
         }
 
-        // Automatically count focus activity towards the user's streak
-        repository.logActivityAndBoostStreak()
-
         // Activate website blocking shield during focus session
         blockingManager?.onFocusSessionStarted()
 
@@ -603,7 +641,12 @@ class OpalViewModel(
                         repository.clearTimerSessionAppBlock()
                         blockingManager?.onFocusSessionEnded()
                         repository.logActivityAndBoostStreak()
-                        repository.refreshRealScreenTime()
+                        val tracking = repository.refreshRealScreenTime()
+                        refreshAchievementProgress(
+                            if (tracking?.errorMessage == null && tracking != null) {
+                                (tracking.totalScreenTimeMillis / 60_000L).toInt()
+                            } else null
+                        )
                         context?.let { ctx ->
                             PermissionHelper.sendPrimeNudgeNotification(
                                 ctx,
@@ -707,7 +750,6 @@ class OpalViewModel(
         )
         _uiState.value = _uiState.value.copy(pomodoroState = runningState)
         repository.savePomodoroState(runningState)
-        repository.logActivityAndBoostStreak()
 
         launchPomodoroLoop()
     }
@@ -755,7 +797,7 @@ class OpalViewModel(
                 if (!curr.isPaused && curr.isRunning) {
                     val nextRemaining = curr.remainingSeconds - 1
                     if (nextRemaining <= 0) {
-                        transitionToNextPomodoroSession()
+                        transitionToNextPomodoroSession(completedNaturally = true)
                     } else {
                         val updated = curr.copy(remainingSeconds = nextRemaining)
                         _uiState.value = _uiState.value.copy(pomodoroState = updated)
@@ -766,17 +808,25 @@ class OpalViewModel(
         }
     }
 
-    private fun transitionToNextPomodoroSession() {
+    private fun transitionToNextPomodoroSession(completedNaturally: Boolean = false) {
         AlarmSoundManager.playSessionTransitionChime()
         val settings = _uiState.value.pomodoroSettings
         val curr = _uiState.value.pomodoroState
 
         when (curr.sessionType) {
             PomodoroSessionType.FOCUS -> {
-                repository.addFocusMinutes(settings.focusMinutes)
-                repository.refreshRealScreenTime()
-                val nextRounds = curr.completedRoundsCount + 1
-                if (curr.currentRound >= settings.roundsPerCycle) {
+                if (completedNaturally) {
+                    repository.addFocusMinutes(settings.focusMinutes, isPomodoro = true)
+                    repository.logActivityAndBoostStreak()
+                    val tracking = repository.refreshRealScreenTime()
+                    refreshAchievementProgress(
+                        if (tracking?.errorMessage == null && tracking != null) {
+                            (tracking.totalScreenTimeMillis / 60_000L).toInt()
+                        } else null
+                    )
+                }
+                val nextRounds = curr.completedRoundsCount + if (completedNaturally) 1 else 0
+                if (completedNaturally && curr.currentRound >= settings.roundsPerCycle) {
                     val longBreakSec = settings.longBreakMinutes * 60
                     val nextState = curr.copy(
                         sessionType = PomodoroSessionType.LONG_BREAK,
@@ -855,10 +905,9 @@ class OpalViewModel(
                 }
             }
         }
-        repository.logActivityAndBoostStreak()
     }
 
-    // ==================== STOPWATCH CONTROLS ====================
+    // ==================== STOPWATCH CONTROLS ===================
 
     fun startStopwatch() {
         stopwatchStartTime = System.currentTimeMillis()

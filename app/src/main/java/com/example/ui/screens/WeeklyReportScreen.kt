@@ -83,8 +83,10 @@ fun WeeklyReportScreen(
         onBackClick()
     }
 
-    val totalWeekMs = trendPoints.sumOf { it.screenTimeMs }.coerceAtLeast(weeklyApps.sumOf { it.totalTimeMs })
-    val dailyAvgMs = if (trendPoints.isNotEmpty()) totalWeekMs / 7 else 0L
+    val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
+    val elapsedDays = (todayDow + 1).coerceAtLeast(1)
+    val totalWeekMs = weeklyApps.sumOf { it.totalTimeMs }
+    val dailyAvgMs = if (weeklyApps.isNotEmpty()) totalWeekMs / elapsedDays else 0L
 
     val dateRangeHeader = rememberCurrentWeekRangeString()
 
@@ -214,7 +216,7 @@ fun WeeklyReportScreen(
         ) {
             Column {
                 Text(
-                    text = RealScreenTimeTracker.formatDuration(dailyAvgMs),
+                    text = if (weeklyApps.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(dailyAvgMs),
                     color = PrimeTextPrimary,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
@@ -229,12 +231,14 @@ fun WeeklyReportScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val dailyTimes = if (trendPoints.isNotEmpty()) trendPoints.map { it.screenTimeMs } else List(7) { 0L }
-
-                WeeklyAverageBarChart(
-                    dailyTimes = dailyTimes,
-                    dailyAvgMs = dailyAvgMs
-                )
+                if (trendPoints.isNotEmpty()) {
+                    WeeklyAverageBarChart(
+                        dailyTimes = trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.map { it.screenTimeMs },
+                        dailyAvgMs = dailyAvgMs
+                    )
+                } else {
+                    Text("Weekly screen-time data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
             }
         }
 
@@ -242,8 +246,8 @@ fun WeeklyReportScreen(
 
         // 2. Top Category Spotlight
         val topCategoryName = weeklyApps.groupBy { it.category }
-            .maxByOrNull { entry -> entry.value.sumOf { it.totalTimeMs } }?.key ?: "Social"
-        val topCategoryApps = weeklyApps.filter { it.category == topCategoryName }
+            .maxByOrNull { entry -> entry.value.sumOf { it.totalTimeMs } }?.key
+        val topCategoryApps = topCategoryName?.let { category -> weeklyApps.filter { it.category == category } }.orEmpty()
         val categoryTotalMs = topCategoryApps.sumOf { it.totalTimeMs }
 
         GlassCard(
@@ -257,7 +261,7 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = topCategoryName,
+                        text = topCategoryName ?: "No usage data",
                         color = PrimeTextPrimary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold
@@ -272,7 +276,7 @@ fun WeeklyReportScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Favorite,
-                            contentDescription = "$topCategoryName Category",
+                            contentDescription = "${topCategoryName ?: "No usage data"} category",
                             tint = Color(0xFFFF6B6B),
                             modifier = Modifier.size(18.dp)
                         )
@@ -282,7 +286,7 @@ fun WeeklyReportScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = RealScreenTimeTracker.formatDuration(categoryTotalMs),
+                    text = if (weeklyApps.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(categoryTotalMs),
                     color = PrimeTextPrimary,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
@@ -292,7 +296,7 @@ fun WeeklyReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${RealScreenTimeTracker.formatDuration(categoryTotalMs / 7)} daily average for this category",
+                    text = if (weeklyApps.isEmpty()) "Category average unavailable" else "${RealScreenTimeTracker.formatDuration(categoryTotalMs / elapsedDays)} daily average for this category",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
@@ -338,7 +342,7 @@ fun WeeklyReportScreen(
                     }
                 } else {
                     Text(
-                        text = if (!hasUsagePermission) "Permission needed to view category usage" else "No $topCategoryName activity tracked this week",
+                        text = if (!hasUsagePermission) "Permission needed to view category usage" else "No category activity tracked this week",
                         color = PrimeTextSecondary,
                         fontSize = 13.sp
                     )
@@ -369,7 +373,7 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = RealScreenTimeTracker.formatDuration(totalWeekMs),
+                        text = if (trendPoints.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(totalWeekMs),
                         color = PrimeTextPrimary,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -392,10 +396,10 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val legendLevels = listOf(
-                        "0~15" to Color(0xFF263238),
-                        "15~30" to Color(0xFF1E88E5),
-                        "30~45" to Color(0xFF0D47A1),
-                        "45~60" to PrimeAccent
+                        "0" to Color(0xFF263238),
+                        "1~14" to Color(0xFF1E88E5),
+                        "15~29" to Color(0xFF0D47A1),
+                        "30+" to PrimeAccent
                     )
                     legendLevels.forEach { (label, color) ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -417,7 +421,11 @@ fun WeeklyReportScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Heatmap24HourGrid(matrix = heatmapMatrix)
+                if (heatmapMatrix.size == 7 && heatmapMatrix.all { it.size == 24 }) {
+                    Heatmap24HourGrid(matrix = heatmapMatrix)
+                } else {
+                    Text("Hourly usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -569,7 +577,7 @@ fun WeeklyAverageBarChart(dailyTimes: List<Long>, dailyAvgMs: Long) {
             )
         }
 
-        // 7 Bars
+        // Bars for elapsed days only
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -598,7 +606,7 @@ fun WeeklyAverageBarChart(dailyTimes: List<Long>, dailyAvgMs: Long) {
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            dayLabels.forEach { label ->
+            dayLabels.take(dailyTimes.size).forEach { label ->
                 Text(
                     text = label,
                     color = PrimeTextTertiary,
@@ -621,7 +629,11 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
         PrimeAccent
     )
 
-    val rows = if (matrix.size == 7) matrix else List(7) { List(24) { 0 } }
+    if (matrix.size != 7 || matrix.any { it.size != 24 }) {
+        Text("Hourly usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+        return
+    }
+    val rows = matrix
 
     Column(modifier = Modifier.fillMaxWidth()) {
         rows.forEachIndexed { dayIdx, row ->
@@ -632,7 +644,7 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 row.forEach { intensity ->
-                    val color = colorLevels.getOrElse(intensity) { colorLevels.last() }
+                    val color = if (intensity < 0) PrimeBackground else colorLevels.getOrElse(intensity) { colorLevels.last() }
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -672,7 +684,7 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
 }
 
 private fun rememberCurrentWeekRangeString(): String {
-    val cal = Calendar.getInstance()
+    val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val weekOfYear = cal.get(Calendar.WEEK_OF_YEAR)
 
     cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)

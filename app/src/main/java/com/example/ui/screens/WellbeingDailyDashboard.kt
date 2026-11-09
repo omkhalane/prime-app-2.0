@@ -61,6 +61,7 @@ import com.example.ui.theme.PrimeSurfaceHigher
 import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeTextSecondary
 import com.example.ui.theme.PrimeTextTertiary
+import java.util.Calendar
 
 @Composable
 fun WellbeingDailyDashboard(
@@ -220,7 +221,13 @@ fun WellbeingDailyDashboard(
         }
 
         // Card 1: Screen Time Stacked Bar Chart
-        val currentScreenTime = if (totalScreenTime.isNotBlank() && totalScreenTime != "Permission Required") totalScreenTime else "0m"
+        val currentScreenTime = when {
+            !hasUsagePermission -> "Permission required"
+            totalScreenTime.isNotBlank() &&
+                totalScreenTime != "Permission Required" &&
+                totalScreenTime != "Unavailable" -> totalScreenTime
+            else -> "No data"
+        }
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp)
@@ -236,12 +243,16 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                StackedBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("8 h", "4 h"),
-                    valueExtractor = { it.screenTimeMs },
-                    maxValue = (trendPoints.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
-                )
+                if (trendPoints.isNotEmpty()) {
+                    StackedBarChart(
+                        dataPoints = trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 },
+                        yAxisLabels = listOf("8 h", "4 h"),
+                        valueExtractor = { it.screenTimeMs },
+                        maxValue = (trendPoints.filter { it.dayIndex <= Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1 }.maxOfOrNull { it.screenTimeMs } ?: 0L).coerceAtLeast(8L * 3600 * 1000)
+                    )
+                } else {
+                    Text("Daily usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -316,14 +327,15 @@ fun WellbeingDailyDashboard(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Card 2: Notifications Stacked Bar Chart
-        val totalNotifs = trendPoints.firstOrNull { it.isToday }?.notifications ?: 0
+        val todayNotificationCount = trendPoints.firstOrNull { it.isToday }?.notifications
+        val notificationPoints = trendPoints.filter { it.notifications >= 0 }
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp)
         ) {
             Column {
                 Text(
-                    text = "$totalNotifs notifications",
+                    text = if (todayNotificationCount == null || todayNotificationCount < 0) "Unavailable" else "$todayNotificationCount notification interruptions",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -332,17 +344,25 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                StackedBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("300", "200", "100"),
-                    valueExtractor = { it.notifications.toLong() },
-                    maxValue = (trendPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L)
-                )
+                if (notificationPoints.isNotEmpty()) {
+                    StackedBarChart(
+                        dataPoints = notificationPoints,
+                        yAxisLabels = listOf("300", "200", "100"),
+                        valueExtractor = { it.notifications.toLong() },
+                        maxValue = (notificationPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L)
+                    )
+                } else {
+                    Text("Notification event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = if (totalNotifs > 0) "System notifications recorded today" else "No incoming notifications logged today",
+                    text = when {
+                        todayNotificationCount == null || todayNotificationCount < 0 -> "Notification event data unavailable"
+                        todayNotificationCount > 0 -> "Notification interruptions recorded today"
+                        else -> "No notification interruptions logged today"
+                    },
                     color = PrimeTextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -353,14 +373,15 @@ fun WellbeingDailyDashboard(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Card 3: Unlocks Bar Chart
-        val todayUnlocks = trendPoints.firstOrNull { it.isToday }?.unlocks ?: 0
+        val todayUnlockCount = trendPoints.firstOrNull { it.isToday }?.unlocks
+        val unlockPoints = trendPoints.filter { it.unlocks >= 0 }
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp)
         ) {
             Column {
                 Text(
-                    text = "$todayUnlocks unlocks",
+                    text = if (todayUnlockCount == null || todayUnlockCount < 0) "Unavailable" else "$todayUnlockCount unlocks",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -369,13 +390,17 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                SingleColorBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("90", "60", "30"),
-                    valueExtractor = { it.unlocks.toLong() },
-                    maxValue = (trendPoints.maxOfOrNull { it.unlocks.toLong() } ?: 0L).coerceAtLeast(30L),
-                    barColor = PrimeInfo
-                )
+                if (unlockPoints.isNotEmpty()) {
+                    SingleColorBarChart(
+                        dataPoints = unlockPoints,
+                        yAxisLabels = listOf("90", "60", "30"),
+                        valueExtractor = { it.unlocks.toLong() },
+                        maxValue = (unlockPoints.maxOfOrNull { it.unlocks.toLong() } ?: 0L).coerceAtLeast(30L),
+                        barColor = PrimeInfo
+                    )
+                } else {
+                    Text("Unlock event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
             }
         }
 

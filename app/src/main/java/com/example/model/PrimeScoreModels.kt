@@ -141,7 +141,7 @@ data class PrimeScoreBreakdown(
     val targetBlockingMinutes: Int = 180,
     val rolling7DayAverage: Int = 0,
     val currentRank: PrimeRankTier = PrimeRankTier.AWAKENING,
-    val hasPermission: Boolean = true,
+    val hasPermission: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -257,12 +257,12 @@ data class WeeklyMission(
  * Overall Progression State.
  */
 data class PrimeProgression(
-    val totalXp: Int = 2450,
-    val primeLevel: Int = 7,
-    val currentLevelXp: Int = 450,
-    val xpForNextLevel: Int = 500,
-    val pinnedBadgeIds: List<String> = listOf("time_guardian", "focus_hunter", "shield_bearer"),
+    val totalXp: Int = 0,
+    val primeLevel: Int = 1,
+    val currentLevelXp: Int = 0,
+    val xpForNextLevel: Int = 400,
+    val pinnedBadgeIds: List<String> = emptyList(),
     val totalBadgesCount: Int = 42,
-    val unlockedBadgesCount: Int = 12,
-    val completionPercentage: Float = 28.6f
+    val unlockedBadgesCount: Int = 0,
+    val completionPercentage: Float = 0f
 )
