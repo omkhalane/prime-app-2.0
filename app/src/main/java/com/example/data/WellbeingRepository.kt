@@ -461,8 +461,6 @@ class WellbeingRepository(private val context: Context) {
                     )
                 )
             }
-            }
-
         }
 
         Result.success(points)
