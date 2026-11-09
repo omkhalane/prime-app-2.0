@@ -81,8 +81,7 @@ class BlockingManager private constructor(private val context: Context) {
         checkpointBlockingDuration()
     }
 
-    fun onAccessibilityServiceStateChanged(running: Boolean) {
-        OpalAccessibilityService.isServiceRunning = running
+    fun onAccessibilityServiceStateChanged() {
         checkpointBlockingDuration()
     }
 
