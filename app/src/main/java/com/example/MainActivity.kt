@@ -636,6 +636,8 @@ fun OpalApp() {
                 if (uiState.isRingtonePickerOpen) {
                     RingtoneSelectionSheet(
                         selectedRingtoneId = uiState.editingAlarm?.ringtoneId ?: "zen_crystal",
+                        selectedRingtoneUriString = uiState.editingAlarm?.ringtoneUriString,
+                        selectedRingtoneName = uiState.editingAlarm?.ringtoneName,
                         onDismiss = { viewModel.closeRingtonePicker() },
                         onSelectRingtone = { viewModel.selectRingtone(it) }
                     )
