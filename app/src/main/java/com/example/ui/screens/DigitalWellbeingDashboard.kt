@@ -273,7 +273,7 @@ fun DigitalWellbeingDashboard(
                             .background(PrimeSurfaceHigher)
                     ) {
                         categories.forEach { cat ->
-                            val weight = (cat.totalTimeMs.toFloat() / totalMs.toFloat()).coerceIn(0.04f, 1f)
+                            val weight = cat.totalTimeMs.toFloat().coerceAtLeast(0.001f)
                             Box(
                                 modifier = Modifier
                                     .weight(weight)
