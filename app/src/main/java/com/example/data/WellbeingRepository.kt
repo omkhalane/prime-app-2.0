@@ -99,6 +99,7 @@ class WellbeingRepository(private val context: Context) {
         } catch (_: Exception) {
             emptySet()
         }
+        val launchablePackages = getLaunchablePackages()
 
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
@@ -116,7 +117,7 @@ class WellbeingRepository(private val context: Context) {
         try {
             val aggregated = sm.queryAndAggregateUsageStats(startTime, endTime)
             aggregated?.forEach { (pkg, stat) ->
-                if (!RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
+                if (launchablePackages.contains(pkg) && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
                     appMap[pkg] = stat.totalTimeInForeground
                 }
             }
@@ -193,7 +194,7 @@ class WellbeingRepository(private val context: Context) {
         try {
             val aggregated = sm.queryAndAggregateUsageStats(startTime, endTime)
             aggregated?.forEach { (pkg, stat) ->
-                if (stat.totalTimeInForeground > 0 &&
+                if (launchablePackages.contains(pkg) && stat.totalTimeInForeground > 0 &&
                     !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                 ) {
                     appMap[pkg] = stat.totalTimeInForeground
@@ -288,7 +289,7 @@ class WellbeingRepository(private val context: Context) {
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
         val homePackages = getHomePackages()
-        val segments = queryForegroundSegments(sm, startTime, endTime, homePackages)
+        val segments = queryForegroundSegments(sm, startTime, endTime, homePackages, getLaunchablePackages())
             .getOrElse { return@withContext Result.failure(it) }
         val hourly = LongArray(24)
         segments.forEach { segment ->
@@ -323,7 +324,7 @@ class WellbeingRepository(private val context: Context) {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
         val now = System.currentTimeMillis()
-        val segments = queryForegroundSegments(sm, weekStart, now, getHomePackages())
+        val segments = queryForegroundSegments(sm, weekStart, now, getHomePackages(), getLaunchablePackages())
             .getOrElse { return@withContext Result.failure(it) }
         val gridMillis = Array(7) { LongArray(24) }
         segments.forEach { segment ->
@@ -372,6 +373,7 @@ class WellbeingRepository(private val context: Context) {
         } catch (_: Exception) {
             emptySet()
         }
+        val launchablePackages = getLaunchablePackages()
 
         val points = mutableListOf<DayUsagePoint>()
 
@@ -396,7 +398,7 @@ class WellbeingRepository(private val context: Context) {
                 try {
                     val dailyStats = sm.queryAndAggregateUsageStats(dayStart, dayEnd)
                     dailyStats?.forEach { (pkg, stat) ->
-                        if (!RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) &&
+                        if (launchablePackages.contains(pkg) && !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages) &&
                             stat.totalTimeInForeground > 0
                         ) {
                             dayScreenTime += stat.totalTimeInForeground
@@ -537,6 +539,15 @@ class WellbeingRepository(private val context: Context) {
 
     private data class ForegroundSegment(val packageName: String, val start: Long, val end: Long)
 
+    private fun getLaunchablePackages(): Set<String> {
+        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_LAUNCHER) }
+        return try {
+            packageManager.queryIntentActivities(intent, 0).mapNotNull { it.activityInfo?.packageName }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
     private fun getHomePackages(): Set<String> {
         val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
         return try {
@@ -550,7 +561,8 @@ class WellbeingRepository(private val context: Context) {
         manager: UsageStatsManager,
         startTime: Long,
         endTime: Long,
-        homePackages: Set<String>
+        homePackages: Set<String>,
+        launchablePackages: Set<String>
     ): Result<List<ForegroundSegment>> {
         return try {
             val events = manager.queryEvents(startTime, endTime)
@@ -580,7 +592,7 @@ class WellbeingRepository(private val context: Context) {
                     UsageEvents.Event.ACTIVITY_RESUMED, 1, 4 -> {
                         if (pkg != null) {
                             closeActive(timestamp)
-                            if (screenInteractive && !keyguardVisible &&
+                            if (screenInteractive && !keyguardVisible && launchablePackages.contains(pkg) &&
                                 !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                             ) {
                                 activePackage = pkg
