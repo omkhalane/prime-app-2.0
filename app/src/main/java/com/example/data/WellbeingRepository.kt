@@ -144,8 +144,8 @@ class WellbeingRepository(private val context: Context) {
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
-        } catch (e: Exception) {
-            return@withContext Result.failure(e)
+        } catch (_: Exception) {
+            // Android foreground durations remain valid; event counters stay null when unavailable.
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
@@ -177,6 +177,7 @@ class WellbeingRepository(private val context: Context) {
 
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
+        val packagesWithEvents = mutableSetOf<String>()
 
         val calendar = Calendar.getInstance().apply {
             firstDayOfWeek = Calendar.SUNDAY
@@ -205,24 +206,23 @@ class WellbeingRepository(private val context: Context) {
 
         // Count real opens and notification interruption events; do not infer either from time.
         val notificationCounts = mutableMapOf<String, Int>()
-        var sawUsageEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
-                sawUsageEvent = true
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
+                packagesWithEvents.add(pkg)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED, 1 ->
+                    UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
                     12 ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
-        } catch (e: Exception) {
-            return@withContext Result.failure(e)
+        } catch (_: Exception) {
+            // Android foreground durations remain valid; event counters stay null when unavailable.
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
