@@ -182,6 +182,13 @@ object AlarmSoundManager {
     /** Mute/unmute alarm audio without disabling vibration or dismissing the alarm. */
     fun setMuted(context: Context, isMuted: Boolean) {
         muted = isMuted
+        if (isMuted) {
+            fadeJob?.cancel()
+            fadeJob = null
+        } else {
+            outputGain = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+                .getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f
+        }
         mediaPlayer?.setVolume(if (isMuted) 0f else outputGain, if (isMuted) 0f else outputGain)
         if (mediaPlayer == null) {
             if (isMuted) {
