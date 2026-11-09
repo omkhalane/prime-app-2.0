@@ -63,13 +63,25 @@ import com.example.ui.theme.OpalTextSecondary
 @Composable
 fun RingtoneSelectionSheet(
     selectedRingtoneId: String,
+    selectedRingtoneUriString: String? = null,
+    selectedRingtoneName: String? = null,
     onDismiss: () -> Unit,
     onSelectRingtone: (RingtoneOption) -> Unit
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val ringtones = remember { AlarmSoundManager.getAvailableRingtones(context) }
+    val deviceRingtones = remember { AlarmSoundManager.getAvailableRingtones(context) }
+    val ringtones = remember(deviceRingtones, selectedRingtoneId, selectedRingtoneUriString, selectedRingtoneName) {
+        if (selectedRingtoneUriString != null && deviceRingtones.none { it.id == selectedRingtoneId }) {
+            deviceRingtones + RingtoneOption(
+                id = selectedRingtoneId,
+                title = selectedRingtoneName ?: "Imported alarm sound",
+                uriString = selectedRingtoneUriString,
+                isSynthetic = false
+            )
+        } else deviceRingtones
+    }
     var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
 
     val importAudioLauncher = rememberLauncherForActivityResult(
