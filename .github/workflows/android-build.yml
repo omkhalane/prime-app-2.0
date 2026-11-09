@@ -1,9 +1,6 @@
 name: Android build and unit tests
 
 on:
-  push:
-    branches:
-      - fix/real-digital-wellbeing-tracking
   pull_request:
     branches:
       - main
