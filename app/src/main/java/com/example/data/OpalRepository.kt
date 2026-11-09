@@ -673,6 +673,11 @@ class OpalRepository(private val context: Context? = null) {
         OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
                 blockedPackageNames.isNotEmpty() ||
                 OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        context?.let { ctx ->
+            try {
+                com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
+            } catch (_: Exception) { }
+        }
     }
 
     fun applyTimerSessionAppBlock(sessionPackageNames: Set<String>) {
@@ -684,6 +689,11 @@ class OpalRepository(private val context: Context? = null) {
         val combinedBlocked = baseBlockedPackages + sessionPackageNames
         OpalAccessibilityService.blockedPackages = combinedBlocked
         OpalAccessibilityService.isBlockingActive = combinedBlocked.isNotEmpty() || OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        context?.let { ctx ->
+            try {
+                com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
+            } catch (_: Exception) { }
+        }
     }
 
     fun clearTimerSessionAppBlock() {
