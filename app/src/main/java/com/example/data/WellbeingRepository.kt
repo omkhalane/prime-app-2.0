@@ -600,7 +600,7 @@ class WellbeingRepository(private val context: Context) {
                 val timestamp = event.timeStamp.coerceIn(startTime, endTime)
                 val pkg = event.packageName
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    UsageEvents.Event.ACTIVITY_RESUMED, USAGE_EVENT_CONTINUE_PREVIOUS_DAY -> {
                         if (pkg != null) {
                             closeActive(timestamp)
                             if (screenInteractive && !keyguardVisible && launchablePackages.contains(pkg) &&
