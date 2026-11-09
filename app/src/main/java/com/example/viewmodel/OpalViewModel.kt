@@ -782,16 +782,15 @@ class OpalViewModel(
         _uiState.value = _uiState.value.copy(isPomodoroSettingsOpen = false)
     }
 
-    fun savePomodoroSettings(settings: PomodoroSettings) {
-        val safeSettings = settings.copy(
-            focusMinutes = settings.focusMinutes.coerceIn(1, 180),
-            shortBreakMinutes = settings.shortBreakMinutes.coerceIn(1, 60),
-            longBreakMinutes = settings.longBreakMinutes.coerceIn(1, 120),
-            roundsPerCycle = settings.roundsPerCycle.coerceIn(1, 12),
-            totalCycles = settings.totalCycles.coerceIn(1, 20)
+    fun savePomodoroSettings(requestedSettings: PomodoroSettings) {
+        val settings = requestedSettings.copy(
+            focusMinutes = requestedSettings.focusMinutes.coerceIn(1, 180),
+            shortBreakMinutes = requestedSettings.shortBreakMinutes.coerceIn(1, 60),
+            longBreakMinutes = requestedSettings.longBreakMinutes.coerceIn(1, 120),
+            roundsPerCycle = requestedSettings.roundsPerCycle.coerceIn(1, 12),
+            totalCycles = requestedSettings.totalCycles.coerceIn(1, 20)
         )
-        repository.updatePomodoroSettings(safeSettings)
-        val settings = safeSettings
+        repository.updatePomodoroSettings(settings)
         val currentState = _uiState.value.pomodoroState
         val newDuration = if (!currentState.isRunning) {
             when (currentState.sessionType) {
