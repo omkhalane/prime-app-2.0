@@ -991,6 +991,9 @@ class OpalRepository(private val context: Context? = null) {
     fun getTodayFocusSessions(): Int =
         (prefs?.getInt("verified_focus_sessions_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
 
+    fun getTodayPomodoroSessions(): Int =
+        (prefs?.getInt("verified_pomodoro_sessions_${getTodayDateKey()}", 0) ?: 0).coerceAtLeast(0)
+
     fun getWeekFocusSessions(): Int {
         val calendar = java.util.Calendar.getInstance().apply {
             firstDayOfWeek = java.util.Calendar.SUNDAY
