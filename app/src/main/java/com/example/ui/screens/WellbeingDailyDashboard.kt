@@ -323,7 +323,7 @@ fun WellbeingDailyDashboard(
         ) {
             Column {
                 Text(
-                    text = "$totalNotifs notifications",
+                    text = "$totalNotifs notification interruptions",
                     color = PrimeTextPrimary,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
@@ -342,7 +342,7 @@ fun WellbeingDailyDashboard(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = if (totalNotifs > 0) "System notifications recorded today" else "No incoming notifications logged today",
+                    text = if (totalNotifs > 0) "System notifications recorded today" else "No notification interruptions logged today",
                     color = PrimeTextSecondary,
                     fontSize = 12.sp,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
