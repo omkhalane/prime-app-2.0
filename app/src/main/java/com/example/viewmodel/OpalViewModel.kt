@@ -641,7 +641,12 @@ class OpalViewModel(
                         repository.clearTimerSessionAppBlock()
                         blockingManager?.onFocusSessionEnded()
                         repository.logActivityAndBoostStreak()
-                        repository.refreshRealScreenTime()
+                        val tracking = repository.refreshRealScreenTime()
+                        refreshAchievementProgress(
+                            if (tracking?.errorMessage == null && tracking != null) {
+                                (tracking.totalScreenTimeMillis / 60_000L).toInt()
+                            } else null
+                        )
                         context?.let { ctx ->
                             PermissionHelper.sendPrimeNudgeNotification(
                                 ctx,
