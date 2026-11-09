@@ -614,7 +614,7 @@ fun AlarmEditSheet(
                                     val currentConfig = ChallengeConfig(
                                         category = challengeCategory,
                                         difficulty = challengeDifficulty,
-                                        requiredConsecutive = requiredConsecutive,
+                                        requiredConsecutive = requiredConsecutive.coerceIn(1, 5),
                                         isRandomizedCategory = randomizeCategory
                                     )
                                     onTestChallenge(currentConfig)
@@ -774,13 +774,13 @@ fun AlarmEditSheet(
                         val configured = initialAlarm.copy(
                             hour = hour.coerceIn(0, 23),
                             minute = minute.coerceIn(0, 59),
-                            name = name.ifBlank { "Alarm" },
+                            name = name.trim().take(40).ifBlank { "Alarm" },
                             isEnabled = true,
                             recurrence = recurrence,
-                            selectedDays = selectedDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                            selectedDays = selectedDays.filter { it in 1..7 }.toSet().ifEmpty { setOf(1, 2, 3, 4, 5) },
                             specificDateMillis = if (recurrence == AlarmRecurrence.ONCE) specificDateMillis else null,
                             vibrationEnabled = vibrationEnabled,
-                            snoozeDurationMinutes = snoozeMinutes,
+                            snoozeDurationMinutes = snoozeMinutes.coerceIn(1, 30),
                             alarmMode = alarmMode,
                             challengeConfig = ChallengeConfig(
                                 category = challengeCategory,
