@@ -684,7 +684,7 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
 }
 
 private fun rememberCurrentWeekRangeString(): String {
-    val cal = Calendar.getInstance()
+    val cal = Calendar.getInstance().apply { firstDayOfWeek = Calendar.SUNDAY }
     val weekOfYear = cal.get(Calendar.WEEK_OF_YEAR)
 
     cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
