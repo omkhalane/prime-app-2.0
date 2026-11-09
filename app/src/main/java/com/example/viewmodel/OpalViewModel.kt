@@ -411,6 +411,8 @@ class OpalViewModel(
 
             val todayApps = todayAppsResult.getOrNull().orEmpty()
             val weeklyApps = weeklyAppsResult.getOrNull().orEmpty()
+            val todayCategories = repo.getCategoryWiseUsage(todayApps)
+            val weeklyCategories = repo.getCategoryWiseUsage(weeklyApps)
             val hourly = hourlyResult.getOrNull().orEmpty()
             val trend = trendResult.getOrNull().orEmpty()
             val heatmap = heatmapResult.getOrNull().orEmpty()
@@ -433,9 +435,9 @@ class OpalViewModel(
                     screenTimePermissionGranted = true,
                     wellbeingError = errorMessage,
                     todayAppUsage = todayApps,
-                    todayCategoryUsage = repo.getCategoryWiseUsage(todayApps),
+                    todayCategoryUsage = todayCategories,
                     weeklyAppUsage = weeklyApps,
-                    categoryUsage = repo.getCategoryWiseUsage(weeklyApps),
+                    categoryUsage = weeklyCategories,
                     hourlyPeakUsage = hourly,
                     dayUsagePoints = trend,
                     weeklyHeatmap = heatmap
