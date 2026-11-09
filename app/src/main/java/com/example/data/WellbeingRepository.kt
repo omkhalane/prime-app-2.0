@@ -418,6 +418,7 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
 
+                var eventCountersAvailable = true
                 var sawDailyEvent = false
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
@@ -433,24 +434,35 @@ class WellbeingRepository(private val context: Context) {
                             UsageEvents.Event.KEYGUARD_HIDDEN -> dayUnlocks++
                         }
                     }
-                } catch (e: Exception) {
-                    return@withContext Result.failure(e)
+                } catch (_: Exception) {
+                    eventCountersAvailable = false
                 }
-                if (!sawDailyEvent && dayScreenTime > 0L) {
-                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for ${dayLabels[dow]}."))
-                }
+                if (!sawDailyEvent) eventCountersAvailable = false
+
+                points.add(
+                    DayUsagePoint(
+                        dayLabel = dayLabels[dow],
+                        dayIndex = dow,
+                        screenTimeMs = dayScreenTime,
+                        notifications = if (eventCountersAvailable) dayNotifications else -1,
+                        unlocks = if (eventCountersAvailable) dayUnlocks else -1,
+                        isToday = (dow == todayDow)
+                    )
+                )
+            } else {
+                points.add(
+                    DayUsagePoint(
+                        dayLabel = dayLabels[dow],
+                        dayIndex = dow,
+                        screenTimeMs = 0L,
+                        notifications = -1,
+                        unlocks = -1,
+                        isToday = false
+                    )
+                )
+            }
             }
 
-            points.add(
-                DayUsagePoint(
-                    dayLabel = dayLabels[dow],
-                    dayIndex = dow,
-                    screenTimeMs = dayScreenTime,
-                    notifications = dayNotifications,
-                    unlocks = dayUnlocks,
-                    isToday = (dow == todayDow)
-                )
-            )
         }
 
         Result.success(points)
