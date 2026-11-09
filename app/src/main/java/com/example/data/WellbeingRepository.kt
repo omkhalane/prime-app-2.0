@@ -127,11 +127,13 @@ class WellbeingRepository(private val context: Context) {
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawUsageEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
+                sawUsageEvent = true
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
@@ -143,6 +145,9 @@ class WellbeingRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             return@withContext Result.failure(e)
+        }
+        if (!sawUsageEvent && appMap.isNotEmpty()) {
+            return@withContext Result.failure(IllegalStateException("Android returned app durations but no usage events for today; open and notification counters are unavailable."))
         }
 
         val result = appMap.map { (pkg, duration) ->
@@ -200,11 +205,13 @@ class WellbeingRepository(private val context: Context) {
 
         // Count real opens and notification interruption events; do not infer either from time.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawUsageEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
+                sawUsageEvent = true
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
@@ -216,6 +223,9 @@ class WellbeingRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             return@withContext Result.failure(e)
+        }
+        if (!sawUsageEvent && appMap.isNotEmpty()) {
+            return@withContext Result.failure(IllegalStateException("Android returned app durations but no usage events for this week; open and notification counters are unavailable."))
         }
 
         val result = appMap.map { (pkg, duration) ->
@@ -399,8 +409,10 @@ class WellbeingRepository(private val context: Context) {
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
+                    var sawDailyEvent = false
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
+                        sawDailyEvent = true
                         val pkg = event.packageName
                         when (event.eventType) {
                             12 -> if (pkg != null &&
@@ -411,6 +423,9 @@ class WellbeingRepository(private val context: Context) {
                     }
                 } catch (e: Exception) {
                     return@withContext Result.failure(e)
+                }
+                if (!sawDailyEvent && dayScreenTime > 0L) {
+                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for $dayLabel."))
                 }
             }
 
@@ -472,9 +487,11 @@ class WellbeingRepository(private val context: Context) {
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
+                    var sawAppEvent = false
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
                         if (event.packageName == packageName) {
+                            sawAppEvent = true {
                             when (event.eventType) {
                                 UsageEvents.Event.ACTIVITY_RESUMED, 1 -> opens++
                                 12 -> notifications++
@@ -483,6 +500,9 @@ class WellbeingRepository(private val context: Context) {
                     }
                 } catch (e: Exception) {
                     return@withContext Result.failure(e)
+                }
+                if (!sawAppEvent && dayMs > 0L) {
+                    return@withContext Result.failure(IllegalStateException("Android returned screen-time totals but no usage events for $appName on $dayLabel."))
                 }
             }
 
@@ -536,6 +556,7 @@ class WellbeingRepository(private val context: Context) {
             val events = manager.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
             val segments = mutableListOf<ForegroundSegment>()
+            var sawEvent = false
             var activePackage: String? = null
             var activeStart = 0L
             var screenInteractive = true
@@ -552,6 +573,7 @@ class WellbeingRepository(private val context: Context) {
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
+                sawEvent = true
                 val timestamp = event.timeStamp.coerceIn(startTime, endTime)
                 val pkg = event.packageName
                 when (event.eventType) {
@@ -578,7 +600,11 @@ class WellbeingRepository(private val context: Context) {
                 }
             }
             closeActive(endTime)
-            Result.success(segments)
+            if (!sawEvent) {
+                Result.failure(IllegalStateException("Android did not expose usage events for the requested time range."))
+            } else {
+                Result.success(segments)
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
