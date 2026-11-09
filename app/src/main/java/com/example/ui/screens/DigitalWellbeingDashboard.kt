@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,11 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.AppUsageData
 import com.example.data.CategoryUsage
 import com.example.data.RealScreenTimeTracker
@@ -152,40 +149,23 @@ fun DigitalWellbeingDashboard(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Header: Prime Logo + "Digital Wellbeing"
+        // Native-style page heading: keep the analytics content primary.
         Column(
             modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = R.drawable.prime_logo),
-                    contentDescription = "Prime Logo",
-                    modifier = Modifier.size(26.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "PRIME",
-                    color = PrimeAccent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Digital Wellbeing",
                 color = PrimeTextPrimary,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.5).sp
-            )
-            Text(
-                text = "BECOME YOUR PRIME",
-                color = PrimeTextTertiary,
-                fontSize = 10.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.6.sp
+                letterSpacing = (-0.4).sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Your device activity",
+                color = PrimeTextSecondary,
+                fontSize = 13.sp
             )
         }
 
