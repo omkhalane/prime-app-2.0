@@ -246,6 +246,9 @@ class OpalViewModel(
         }
         if (_uiState.value.isTimerRunning) {
             startRecoveredTimerLoop()
+            context?.let { ctx ->
+                ClockTimerReceiver.schedule(ctx, _uiState.value.timerRemainingSeconds * 1000L, "Focus timer complete", "Your focus session is finished. Take a mindful break.")
+            }
         }
         if (_uiState.value.pomodoroState.isRunning && !_uiState.value.pomodoroState.isPaused) {
             launchPomodoroLoop()
@@ -661,6 +664,7 @@ class OpalViewModel(
                         val completedMin = _uiState.value.timerSelectedMinutes
                         repository.addFocusMinutes(completedMin)
                         repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+                        context?.let { ClockTimerReceiver.cancel(it) }
                         _uiState.value = _uiState.value.copy(
                             timerRemainingSeconds = 0,
                             isTimerRunning = false,
@@ -712,7 +716,8 @@ class OpalViewModel(
 
     fun stopTimer() {
         timerJob?.cancel()
-        repository.clearStandardTimerState()
+        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+        context?.let { ClockTimerReceiver.cancel(it) }
         // Automatically unblock session-blocked apps and websites when session is stopped
         repository.clearTimerSessionAppBlock()
         blockingManager?.onFocusSessionEnded()
@@ -733,7 +738,8 @@ class OpalViewModel(
                 if (!_uiState.value.isTimerPaused) {
                     val remaining = repository.getSavedStandardTimerState().first
                     if (remaining <= 0) {
-                        repository.clearStandardTimerState()
+                        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+                        context?.let { ClockTimerReceiver.cancel(it) }
                         repository.clearTimerSessionAppBlock()
                         blockingManager?.onFocusSessionEnded()
                         _uiState.value = _uiState.value.copy(
