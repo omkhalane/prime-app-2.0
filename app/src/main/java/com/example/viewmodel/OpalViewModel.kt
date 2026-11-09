@@ -252,6 +252,15 @@ class OpalViewModel(
         }
         if (_uiState.value.pomodoroState.isRunning && !_uiState.value.pomodoroState.isPaused) {
             launchPomodoroLoop()
+            context?.let { ctx ->
+                ClockTimerReceiver.schedule(
+                    ctx,
+                    _uiState.value.pomodoroState.remainingSeconds.coerceAtLeast(1) * 1000L,
+                    "Pomodoro session complete",
+                    "Your ${_uiState.value.pomodoroState.sessionType.displayName.lowercase()} session is finished.",
+                    _uiState.value.clockPreferences.sessionSoundsEnabled
+                )
+            }
         }
         if (_uiState.value.stopwatchState.isRunning) {
             val saved = repository.getSavedStopwatchState()
@@ -844,7 +853,7 @@ class OpalViewModel(
         )
         _uiState.value = _uiState.value.copy(pomodoroState = runningState)
         repository.savePomodoroState(runningState)
-        context?.let { ClockTimerReceiver.schedule(it, targetSeconds * 1000L, "Pomodoro session complete", "Your ${current.sessionType.displayName.lowercase()} session is finished.") }
+        context?.let { ClockTimerReceiver.schedule(it, targetSeconds * 1000L, "Pomodoro session complete", "Your ${current.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
 
         launchPomodoroLoop()
     }
@@ -860,7 +869,7 @@ class OpalViewModel(
         val updated = _uiState.value.pomodoroState.copy(isPaused = false)
         _uiState.value = _uiState.value.copy(pomodoroState = updated)
         repository.savePomodoroState(updated)
-        context?.let { ClockTimerReceiver.schedule(it, updated.remainingSeconds * 1000L, "Pomodoro session complete", "Your ${updated.sessionType.displayName.lowercase()} session is finished.") }
+        context?.let { ClockTimerReceiver.schedule(it, updated.remainingSeconds * 1000L, "Pomodoro session complete", "Your ${updated.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
         launchPomodoroLoop()
     }
 
@@ -1010,7 +1019,8 @@ class OpalViewModel(
                     ctx,
                     nextPomodoro.remainingSeconds.coerceAtLeast(1) * 1000L,
                     "Pomodoro session complete",
-                    "Your ${nextPomodoro.sessionType.displayName.lowercase()} session is finished."
+                    "Your ${nextPomodoro.sessionType.displayName.lowercase()} session is finished.",
+                    _uiState.value.clockPreferences.sessionSoundsEnabled
                 )
             } else {
                 ClockTimerReceiver.cancel(ctx)
