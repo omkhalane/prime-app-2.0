@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Never cancel an active Android build just because another commit was pushed.
+  cancel-in-progress: false
 
 jobs:
   android:
@@ -36,7 +37,13 @@ jobs:
       - name: Install Android SDK packages
         run: |
           sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-          yes | sdkmanager --licenses
+          # sdkmanager closes stdin after accepting all licenses. Ignore the
+          # resulting SIGPIPE from "yes", but preserve sdkmanager's exit code.
+          set +e
+          yes 2>/dev/null | sdkmanager --licenses
+          sdkmanager_status=${PIPESTATUS[1]}
+          set -e
+          exit "$sdkmanager_status"
 
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
