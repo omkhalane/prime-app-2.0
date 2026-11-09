@@ -390,6 +390,7 @@ class OpalViewModel(
             }
 
             if (!repo.hasUsageStatsPermission()) {
+                withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
                 _uiState.update {
                     it.copy(
                         isWellbeingLoading = false,
@@ -401,7 +402,7 @@ class OpalViewModel(
             }
 
             // Keep the home/profile screen-time value in sync with the same refresh.
-            withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
+            val trackerResult = withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
 
             val todayAppsResult = repo.getTodayAppUsage()
             val weeklyAppsResult = repo.getWeeklyAppUsage()
@@ -427,7 +428,7 @@ class OpalViewModel(
 
             val errorMessage = errors.firstOrNull()?.let { error ->
                 error.message ?: "Android usage statistics could not be read."
-            }
+            } ?: trackerResult?.errorMessage
 
             _uiState.update {
                 it.copy(
