@@ -173,10 +173,16 @@ class WellbeingRepository(private val context: Context) {
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
 
-        val calendar = Calendar.getInstance()
-        val endTime = calendar.timeInMillis
-        calendar.add(Calendar.DAY_OF_YEAR, -7)
+        val calendar = Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.SUNDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
         val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
 
         // Android's aggregate API returns a total per package for the requested range.
         try {
@@ -254,144 +260,83 @@ class WellbeingRepository(private val context: Context) {
             }.sortedByDescending { it.totalTimeMs }
     }
 
-    // 3. Peak Usage Hourly Analysis (0-23 Hours) from real system events
+    // Build hourly totals from a single foreground-app timeline. This avoids
+    // independently pairing each package's events, which can double-count time.
     suspend fun getHourlyPeakUsageData(): Result<List<HourlyPeakUsage>> = withContext(Dispatchers.IO) {
         if (!hasUsageStatsPermission()) {
             return@withContext Result.failure(SecurityException("Usage access permission is required."))
         }
         val sm = usageStatsManager ?: return@withContext Result.failure(IllegalStateException("UsageStatsManager not available."))
-
-        val hourlyMap = IntArray(24) { 0 }.toMutableList()
-
-        val calendar = Calendar.getInstance()
-        val endTime = calendar.timeInMillis
-        calendar.add(Calendar.DAY_OF_YEAR, -7)
-        val startTime = calendar.timeInMillis
-
-        try {
-            val events = sm.queryEvents(startTime, endTime)
-            val event = UsageEvents.Event()
-            val lastEventTime = mutableMapOf<String, Long>()
-
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                val pkg = event.packageName ?: continue
-                if (pkg == context.packageName) continue
-
-                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    lastEventTime[pkg] = event.timeStamp
-                } else if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED || event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) {
-                    val start = lastEventTime.remove(pkg)
-                    if (start != null) {
-                        var currentStart: Long = start
-                        val end: Long = minOf(event.timeStamp, start + 2 * 60 * 60 * 1000L)
-
-                        while (currentStart < end) {
-                            val slotCal = Calendar.getInstance().apply { timeInMillis = currentStart }
-                            val hour = slotCal.get(Calendar.HOUR_OF_DAY).coerceIn(0, 23)
-
-                            slotCal.set(Calendar.MINUTE, 0)
-                            slotCal.set(Calendar.SECOND, 0)
-                            slotCal.set(Calendar.MILLISECOND, 0)
-                            slotCal.add(Calendar.HOUR_OF_DAY, 1)
-                            val nextHourStart: Long = slotCal.timeInMillis
-
-                            val chunkEnd: Long = minOf(end, nextHourStart)
-                            val chunkDuration = (chunkEnd - currentStart).toInt()
-
-                            hourlyMap[hour] = (hourlyMap[hour] + chunkDuration)
-                            currentStart = chunkEnd
-                        }
-                    }
-                } else if (event.eventType == 16 || event.eventType == 17 || event.eventType == 26) {
-                    lastEventTime.clear()
-                }
-            }
-        } catch (e: Exception) {
-            return@withContext Result.failure(e)
+        val calendar = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, -7)
         }
-
-        Result.success(hourlyMap.mapIndexed { hour, duration -> HourlyPeakUsage(hour, duration.toLong()) })
+        val startTime = calendar.timeInMillis
+        val endTime = System.currentTimeMillis()
+        val homePackages = getHomePackages()
+        val segments = queryForegroundSegments(sm, startTime, endTime, homePackages)
+            .getOrElse { return@withContext Result.failure(it) }
+        val hourly = LongArray(24)
+        segments.forEach { segment ->
+            var cursor = segment.start
+            while (cursor < segment.end) {
+                val slot = Calendar.getInstance().apply { timeInMillis = cursor }
+                val hour = slot.get(Calendar.HOUR_OF_DAY)
+                slot.set(Calendar.MINUTE, 0)
+                slot.set(Calendar.SECOND, 0)
+                slot.set(Calendar.MILLISECOND, 0)
+                slot.add(Calendar.HOUR_OF_DAY, 1)
+                val chunkEnd = minOf(segment.end, slot.timeInMillis)
+                hourly[hour] += (chunkEnd - cursor).coerceAtLeast(0L)
+                cursor = chunkEnd
+            }
+        }
+        Result.success(hourly.mapIndexed { hour, duration -> HourlyPeakUsage(hour, duration) })
     }
 
-    // Real 7x24 Heatmap Matrix (Sun..Sat x 0..23h) computed strictly from system UsageEvents
+    // 7x24 heatmap from the same foreground timeline used by the hourly chart.
     suspend fun getWeeklyHeatmapMatrix(): Result<List<List<Int>>> = withContext(Dispatchers.IO) {
         if (!hasUsageStatsPermission()) {
             return@withContext Result.failure(SecurityException("Usage access permission is required."))
         }
         val sm = usageStatsManager ?: return@withContext Result.failure(IllegalStateException("UsageStatsManager not available."))
-
-        // matrix: 7 days (Sun=0..Sat=6) x 24 hours (0..23) in milliseconds
-        val gridMillis = Array(7) { LongArray(24) { 0L } }
-
-        val cal = Calendar.getInstance().apply {
+        val weekStart = Calendar.getInstance().apply {
             firstDayOfWeek = Calendar.SUNDAY
             set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
-        }
-        val weekStart = cal.timeInMillis
-        val weekEnd = System.currentTimeMillis()
-
-        try {
-            val events = sm.queryEvents(weekStart, weekEnd)
-            val event = UsageEvents.Event()
-            val lastEventTime = mutableMapOf<String, Long>()
-
-            while (events.hasNextEvent()) {
-                events.getNextEvent(event)
-                val pkg = event.packageName ?: continue
-                if (pkg == context.packageName) continue
-
-                if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    lastEventTime[pkg] = event.timeStamp
-                } else if (event.eventType == UsageEvents.Event.ACTIVITY_PAUSED || event.eventType == UsageEvents.Event.ACTIVITY_STOPPED) {
-                    val start = lastEventTime.remove(pkg)
-                    if (start != null && start >= weekStart) {
-                        var currentStart: Long = start
-                        val end: Long = minOf(event.timeStamp, start + 2 * 60 * 60 * 1000L)
-
-                        while (currentStart < end) {
-                            val slotCal = Calendar.getInstance().apply { timeInMillis = currentStart }
-                            val dow = (slotCal.get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)
-                            val hour = slotCal.get(Calendar.HOUR_OF_DAY).coerceIn(0, 23)
-
-                            slotCal.set(Calendar.MINUTE, 0)
-                            slotCal.set(Calendar.SECOND, 0)
-                            slotCal.set(Calendar.MILLISECOND, 0)
-                            slotCal.add(Calendar.HOUR_OF_DAY, 1)
-                            val nextHourStart: Long = slotCal.timeInMillis
-
-                            val chunkEnd: Long = minOf(end, nextHourStart)
-                            val chunkDuration = (chunkEnd - currentStart).coerceAtLeast(0L)
-
-                            gridMillis[dow][hour] += chunkDuration
-                            currentStart = chunkEnd
-                        }
-                    }
-                } else if (event.eventType == 16 || event.eventType == 17 || event.eventType == 26) {
-                    lastEventTime.clear()
-                }
+        }.timeInMillis
+        val now = System.currentTimeMillis()
+        val segments = queryForegroundSegments(sm, weekStart, now, getHomePackages())
+            .getOrElse { return@withContext Result.failure(it) }
+        val gridMillis = Array(7) { LongArray(24) }
+        segments.forEach { segment ->
+            var cursor = segment.start
+            while (cursor < segment.end) {
+                val slot = Calendar.getInstance().apply { timeInMillis = cursor }
+                val dow = (slot.get(Calendar.DAY_OF_WEEK) - 1).coerceIn(0, 6)
+                val hour = slot.get(Calendar.HOUR_OF_DAY)
+                slot.set(Calendar.MINUTE, 0)
+                slot.set(Calendar.SECOND, 0)
+                slot.set(Calendar.MILLISECOND, 0)
+                slot.add(Calendar.HOUR_OF_DAY, 1)
+                val chunkEnd = minOf(segment.end, slot.timeInMillis)
+                gridMillis[dow][hour] += (chunkEnd - cursor).coerceAtLeast(0L)
+                cursor = chunkEnd
             }
-        } catch (e: Exception) {
-            return@withContext Result.failure(e)
         }
-
-        // Map milliseconds to levels: 0 (0m), 1 (1..15m), 2 (15..30m), 3 (30..60m)
         val matrix = gridMillis.map { row ->
             row.map { ms ->
-                val minutes = (ms / (1000 * 60)).toInt()
+                val minutes = (ms / 60_000L).toInt()
                 when {
                     minutes <= 0 -> 0
-                    minutes in 1..14 -> 1
-                    minutes in 15..29 -> 2
+                    minutes < 15 -> 1
+                    minutes < 30 -> 2
                     else -> 3
                 }
             }
         }
-
         Result.success(matrix)
     }
 
@@ -565,6 +510,75 @@ class WellbeingRepository(private val context: Context) {
                 dailyAppOpens = dailyOpens
             )
         )
+    }
+
+    private data class ForegroundSegment(val packageName: String, val start: Long, val end: Long)
+
+    private fun getHomePackages(): Set<String> {
+        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
+        return try {
+            packageManager.queryIntentActivities(intent, 0).mapNotNull { it.activityInfo?.packageName }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    private fun queryForegroundSegments(
+        manager: UsageStatsManager,
+        startTime: Long,
+        endTime: Long,
+        homePackages: Set<String>
+    ): Result<List<ForegroundSegment>> {
+        return try {
+            val events = manager.queryEvents(startTime, endTime)
+            val event = UsageEvents.Event()
+            val segments = mutableListOf<ForegroundSegment>()
+            var activePackage: String? = null
+            var activeStart = 0L
+            var screenInteractive = true
+            var keyguardVisible = false
+
+            fun closeActive(at: Long) {
+                val pkg = activePackage
+                if (pkg != null && screenInteractive && !keyguardVisible && at > activeStart) {
+                    segments.add(ForegroundSegment(pkg, activeStart, minOf(at, endTime)))
+                }
+                activePackage = null
+                activeStart = 0L
+            }
+
+            while (events.hasNextEvent()) {
+                events.getNextEvent(event)
+                val timestamp = event.timeStamp.coerceIn(startTime, endTime)
+                val pkg = event.packageName
+                when (event.eventType) {
+                    UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
+                        if (pkg != null) {
+                            if (activePackage != pkg) closeActive(timestamp)
+                            if (screenInteractive && !keyguardVisible &&
+                                !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
+                            ) {
+                                activePackage = pkg
+                                activeStart = timestamp
+                            }
+                        }
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED, 2 -> {
+                        if (pkg != null && activePackage == pkg) closeActive(timestamp)
+                    }
+                    16, 17 -> {
+                        closeActive(timestamp)
+                        if (event.eventType == 16) screenInteractive = false else keyguardVisible = true
+                    }
+                    15 -> screenInteractive = true
+                    18 -> keyguardVisible = false
+                }
+            }
+            closeActive(endTime)
+            Result.success(segments)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     private fun getAppName(packageName: String): String {
