@@ -390,6 +390,7 @@ class OpalViewModel(
 
             if (!repo.hasUsageStatsPermission()) {
                 withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
+                refreshAchievementProgress(screenMinutes = null)
                 _uiState.update {
                     it.copy(
                         isWellbeingLoading = false,
@@ -410,6 +411,9 @@ class OpalViewModel(
             val heatmapResult = repo.getWeeklyHeatmapMatrix()
 
             val todayApps = todayAppsResult.getOrNull().orEmpty()
+            val screenMinutes = todayAppsResult.getOrNull()?.sumOf { it.totalTimeMs }
+                ?.div(60_000L)?.toInt()
+            refreshAchievementProgress(screenMinutes)
             val weeklyApps = weeklyAppsResult.getOrNull().orEmpty()
             val todayCategories = repo.getCategoryWiseUsage(todayApps)
             val weeklyCategories = repo.getCategoryWiseUsage(weeklyApps)
@@ -444,6 +448,15 @@ class OpalViewModel(
                 )
             }
         }
+    }
+
+    private fun refreshAchievementProgress(screenMinutes: Int?) {
+        achievementRepo.updateDailyProgress(
+            screenMinutes = screenMinutes,
+            completedFocusSessions = repository.getTodayFocusSessions(),
+            blockingMinutes = repository.getTodayBlockingMinutes()
+        )
+        achievementRepo.updateWeeklyFocusProgress(repository.getWeekFocusSessions())
     }
 
     // Digital Wellbeing navigation
@@ -798,9 +811,14 @@ class OpalViewModel(
         when (curr.sessionType) {
             PomodoroSessionType.FOCUS -> {
                 if (completedNaturally) {
-                    repository.addFocusMinutes(settings.focusMinutes)
+                    repository.addFocusMinutes(settings.focusMinutes, isPomodoro = true)
                     repository.logActivityAndBoostStreak()
-                    repository.refreshRealScreenTime()
+                    val tracking = repository.refreshRealScreenTime()
+                    refreshAchievementProgress(
+                        if (tracking?.errorMessage == null && tracking != null) {
+                            (tracking.totalScreenTimeMillis / 60_000L).toInt()
+                        } else null
+                    )
                 }
                 val nextRounds = curr.completedRoundsCount + if (completedNaturally) 1 else 0
                 if (completedNaturally && curr.currentRound >= settings.roundsPerCycle) {
