@@ -296,7 +296,7 @@ fun WeeklyReportScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "${RealScreenTimeTracker.formatDuration(categoryTotalMs / elapsedDays)} daily average for this category",
+                    text = if (weeklyApps.isEmpty()) "Category average unavailable" else "${RealScreenTimeTracker.formatDuration(categoryTotalMs / elapsedDays)} daily average for this category",
                     color = PrimeTextSecondary,
                     fontSize = 13.sp
                 )
