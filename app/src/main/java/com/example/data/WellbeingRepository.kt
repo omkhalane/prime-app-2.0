@@ -135,14 +135,14 @@ class WellbeingRepository(private val context: Context) {
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
+                    UsageEvents.Event.ACTIVITY_RESUMED, 1 ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
                     12 ->
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
                 }
             }
-        } catch (_: Exception) {
-            // Android may not expose these event counters on every device.
+        } catch (e: Exception) {
+            return@withContext Result.failure(e)
         }
 
         val result = appMap.map { (pkg, duration) ->
@@ -268,7 +268,12 @@ class WellbeingRepository(private val context: Context) {
         }
         val sm = usageStatsManager ?: return@withContext Result.failure(IllegalStateException("UsageStatsManager not available."))
         val calendar = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, -7)
+            firstDayOfWeek = Calendar.SUNDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
@@ -550,9 +555,9 @@ class WellbeingRepository(private val context: Context) {
                 val timestamp = event.timeStamp.coerceIn(startTime, endTime)
                 val pkg = event.packageName
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
+                    UsageEvents.Event.ACTIVITY_RESUMED, 1, 4 -> {
                         if (pkg != null) {
-                            if (activePackage != pkg) closeActive(timestamp)
+                            closeActive(timestamp)
                             if (screenInteractive && !keyguardVisible &&
                                 !RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)
                             ) {
