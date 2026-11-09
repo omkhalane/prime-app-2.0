@@ -258,22 +258,29 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun testTimerSessionAppBlockingAndAutoUnblocking() {
+    fun testTimerSessionAppBlockingSurvivesDashboardRefreshAndAutoUnblocks() {
         val repo = OpalRepository()
-        // Baseline sync
         repo.syncAccessibilityBlockList()
         val initialBlocked = OpalAccessibilityService.blockedPackages.toSet()
 
-        // Apply a temporary timer session package
         val tempPackage = "com.temp.focus.session"
         repo.applyTimerSessionAppBlock(setOf(tempPackage))
         assertTrue(OpalAccessibilityService.blockedPackages.contains(tempPackage))
         assertTrue(OpalAccessibilityService.isBlockingActive)
 
-        // Clear session block (simulating timer finished or stopped)
+        // A profile/dashboard refresh must not erase temporary timer rules.
+        repo.syncAccessibilityBlockList()
+        assertTrue(OpalAccessibilityService.blockedPackages.contains(tempPackage))
+
         repo.clearTimerSessionAppBlock()
         assertFalse(OpalAccessibilityService.blockedPackages.contains(tempPackage))
         assertEquals(initialBlocked, OpalAccessibilityService.blockedPackages)
+    }
+
+    @Test
+    fun testBlockingMinutesAreZeroUntilEnforcementUptimeIsMeasured() {
+        val repo = OpalRepository()
+        assertEquals(0, repo.getTodayBlockingMinutes())
     }
 
     @Test
