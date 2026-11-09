@@ -231,12 +231,14 @@ fun WeeklyReportScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val dailyTimes = if (trendPoints.isNotEmpty()) trendPoints.map { it.screenTimeMs } else List(7) { 0L }
-
-                WeeklyAverageBarChart(
-                    dailyTimes = dailyTimes,
-                    dailyAvgMs = dailyAvgMs
-                )
+                if (trendPoints.isNotEmpty()) {
+                    WeeklyAverageBarChart(
+                        dailyTimes = trendPoints.map { it.screenTimeMs },
+                        dailyAvgMs = dailyAvgMs
+                    )
+                } else {
+                    Text("Weekly screen-time data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
             }
         }
 
@@ -371,7 +373,7 @@ fun WeeklyReportScreen(
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Text(
-                        text = RealScreenTimeTracker.formatDuration(totalWeekMs),
+                        text = if (trendPoints.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(totalWeekMs),
                         color = PrimeTextPrimary,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
@@ -419,7 +421,11 @@ fun WeeklyReportScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Heatmap24HourGrid(matrix = heatmapMatrix)
+                if (heatmapMatrix.size == 7 && heatmapMatrix.all { it.size == 24 }) {
+                    Heatmap24HourGrid(matrix = heatmapMatrix)
+                } else {
+                    Text("Hourly usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -623,7 +629,11 @@ fun Heatmap24HourGrid(matrix: List<List<Int>>) {
         PrimeAccent
     )
 
-    val rows = if (matrix.size == 7) matrix else List(7) { List(24) { 0 } }
+    if (matrix.size != 7 || matrix.any { it.size != 24 }) {
+        Text("Hourly usage data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+        return
+    }
+    val rows = matrix
 
     Column(modifier = Modifier.fillMaxWidth()) {
         rows.forEachIndexed { dayIdx, row ->
