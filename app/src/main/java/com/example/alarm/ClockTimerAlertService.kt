@@ -30,6 +30,7 @@ class ClockTimerAlertService : Service() {
         val ringtoneId = prefs.getString("clock_default_ringtone_id", "zen_crystal") ?: "zen_crystal"
         val ringtoneUri = prefs.getString("clock_default_ringtone_uri", null)
         val vibration = prefs.getBoolean("clock_alarm_vibration", true)
+        val soundEnabled = intent?.getBooleanExtra(EXTRA_SOUND_ENABLED, true) ?: true
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -61,11 +62,18 @@ class ClockTimerAlertService : Service() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setContentIntent(openApp)
-            .addAction(android.R.drawable.ic_media_pause, "Stop sound", stopIntent)
+            .apply {
+                if (soundEnabled) addAction(android.R.drawable.ic_media_pause, "Stop sound", stopIntent)
+            }
             .build()
 
         startForeground(NOTIFICATION_ID, notification)
-        AlarmSoundManager.startAlarmRinging(this, ringtoneId, ringtoneUri, vibration)
+        if (soundEnabled) {
+            AlarmSoundManager.startAlarmRinging(this, ringtoneId, ringtoneUri, vibration)
+        } else {
+            stopForeground(STOP_FOREGROUND_DETACH)
+            stopSelf()
+        }
         return START_STICKY
     }
 
@@ -80,5 +88,6 @@ class ClockTimerAlertService : Service() {
         const val ACTION_STOP = "com.example.action.CLOCK_TIMER_STOP"
         const val EXTRA_TITLE = "clock_timer_title"
         const val EXTRA_MESSAGE = "clock_timer_message"
+        const val EXTRA_SOUND_ENABLED = "clock_timer_sound_enabled"
     }
 }
