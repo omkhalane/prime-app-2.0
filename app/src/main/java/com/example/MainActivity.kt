@@ -370,7 +370,7 @@ fun OpalApp() {
                     WellbeingDailyDashboard(
                         totalScreenTime = uiState.profile.screenTimeToday,
                         trendPoints = uiState.dayUsagePoints,
-                        topApps = if (uiState.todayAppUsage.isNotEmpty()) uiState.todayAppUsage else uiState.weeklyAppUsage,
+                        topApps = uiState.todayAppUsage,
                         hasUsagePermission = uiState.screenTimePermissionGranted,
                         errorMessage = uiState.wellbeingError,
                         onBackClick = { viewModel.closeDailyDashboard() },
