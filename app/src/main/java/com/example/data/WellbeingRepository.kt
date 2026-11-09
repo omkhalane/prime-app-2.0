@@ -17,8 +17,8 @@ data class AppUsageData(
     val appName: String,
     val totalTimeMs: Long,
     val category: String,
-    val openCount: Int = 0,
-    val notificationCount: Int = 0
+    val openCount: Int? = null,
+    val notificationCount: Int? = null
 )
 
 data class CategoryUsage(
@@ -103,6 +103,7 @@ class WellbeingRepository(private val context: Context) {
 
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
+        val packagesWithEvents = mutableSetOf<String>()
 
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -128,15 +129,14 @@ class WellbeingRepository(private val context: Context) {
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
-        var sawUsageEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
-                sawUsageEvent = true
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
+                packagesWithEvents.add(pkg)
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED ->
                         openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
@@ -147,15 +147,12 @@ class WellbeingRepository(private val context: Context) {
         } catch (e: Exception) {
             return@withContext Result.failure(e)
         }
-        if (!sawUsageEvent && appMap.isNotEmpty()) {
-            return@withContext Result.failure(IllegalStateException("Android returned app durations but no usage events for today; open and notification counters are unavailable."))
-        }
-
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val opens = openCounts[pkg] ?: 0
-            val notifications = notificationCounts[pkg] ?: 0
+            val hasEvents = packagesWithEvents.contains(pkg)
+            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
+            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -227,15 +224,12 @@ class WellbeingRepository(private val context: Context) {
         } catch (e: Exception) {
             return@withContext Result.failure(e)
         }
-        if (!sawUsageEvent && appMap.isNotEmpty()) {
-            return@withContext Result.failure(IllegalStateException("Android returned app durations but no usage events for this week; open and notification counters are unavailable."))
-        }
-
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val opens = openCounts[pkg] ?: 0
-            val notifications = notificationCounts[pkg] ?: 0
+            val hasEvents = packagesWithEvents.contains(pkg)
+            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
+            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
