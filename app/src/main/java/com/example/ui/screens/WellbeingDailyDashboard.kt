@@ -341,12 +341,16 @@ fun WellbeingDailyDashboard(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                StackedBarChart(
-                    dataPoints = trendPoints,
-                    yAxisLabels = listOf("300", "200", "100"),
-                    valueExtractor = { it.notifications.toLong() },
-                    maxValue = (trendPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L)
-                )
+                if (trendPoints.isNotEmpty()) {
+                    StackedBarChart(
+                        dataPoints = trendPoints,
+                        yAxisLabels = listOf("300", "200", "100"),
+                        valueExtractor = { it.notifications.toLong() },
+                        maxValue = (trendPoints.maxOfOrNull { it.notifications.toLong() } ?: 0L).coerceAtLeast(100L)
+                    )
+                } else {
+                    Text("Notification event data unavailable", color = PrimeTextSecondary, fontSize = 13.sp)
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
