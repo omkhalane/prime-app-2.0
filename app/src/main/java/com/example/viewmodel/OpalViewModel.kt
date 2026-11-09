@@ -43,6 +43,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 import android.os.SystemClock
 import com.example.alarm.AlarmSchedulerHelper
@@ -373,21 +375,33 @@ class OpalViewModel(
     fun refreshWellbeingData() {
         val repo = wellbeingRepo ?: return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isWellbeingLoading = true)
-
-            if (!repo.hasUsageStatsPermission()) {
-                _uiState.value = _uiState.value.copy(
-                    isWellbeingLoading = false,
-                    screenTimePermissionGranted = false,
-                    wellbeingError = "Usage Access permission required to read device screen time and wellbeing analytics.",
+            _uiState.update {
+                it.copy(
+                    isWellbeingLoading = true,
+                    wellbeingError = null,
+                    todayAppUsage = emptyList(),
+                    todayCategoryUsage = emptyList(),
                     weeklyAppUsage = emptyList(),
                     categoryUsage = emptyList(),
                     hourlyPeakUsage = emptyList(),
                     dayUsagePoints = emptyList(),
                     weeklyHeatmap = emptyList()
                 )
+            }
+
+            if (!repo.hasUsageStatsPermission()) {
+                _uiState.update {
+                    it.copy(
+                        isWellbeingLoading = false,
+                        screenTimePermissionGranted = false,
+                        wellbeingError = "Usage Access permission is required to read device screen time and wellbeing analytics."
+                    )
+                }
                 return@launch
             }
+
+            // Keep the home/profile screen-time value in sync with the same refresh.
+            withContext(Dispatchers.IO) { repository.refreshRealScreenTime() }
 
             val todayAppsResult = repo.getTodayAppUsage()
             val weeklyAppsResult = repo.getWeeklyAppUsage()
@@ -395,26 +409,38 @@ class OpalViewModel(
             val trendResult = repo.get7DayWeeklyTrend()
             val heatmapResult = repo.getWeeklyHeatmapMatrix()
 
-            val todayApps = todayAppsResult.getOrNull() ?: emptyList()
-            val todayCategories = repo.getCategoryWiseUsage(todayApps)
-            val weeklyApps = weeklyAppsResult.getOrNull() ?: emptyList()
-            val categories = repo.getCategoryWiseUsage(weeklyApps)
-            val hourly = hourlyResult.getOrNull() ?: emptyList()
-            val trend = trendResult.getOrNull() ?: emptyList()
-            val heatmap = heatmapResult.getOrNull() ?: emptyList()
+            val todayApps = todayAppsResult.getOrNull().orEmpty()
+            val weeklyApps = weeklyAppsResult.getOrNull().orEmpty()
+            val hourly = hourlyResult.getOrNull().orEmpty()
+            val trend = trendResult.getOrNull().orEmpty()
+            val heatmap = heatmapResult.getOrNull().orEmpty()
 
-            _uiState.value = _uiState.value.copy(
-                isWellbeingLoading = false,
-                wellbeingError = null,
-                screenTimePermissionGranted = true,
-                todayAppUsage = todayApps,
-                todayCategoryUsage = todayCategories,
-                weeklyAppUsage = weeklyApps,
-                categoryUsage = categories,
-                hourlyPeakUsage = hourly,
-                dayUsagePoints = trend,
-                weeklyHeatmap = heatmap
-            )
+            val errors = listOf(
+                todayAppsResult.exceptionOrNull(),
+                weeklyAppsResult.exceptionOrNull(),
+                hourlyResult.exceptionOrNull(),
+                trendResult.exceptionOrNull(),
+                heatmapResult.exceptionOrNull()
+            ).filterNotNull()
+
+            val errorMessage = errors.firstOrNull()?.let { error ->
+                error.message ?: "Android usage statistics could not be read."
+            }
+
+            _uiState.update {
+                it.copy(
+                    isWellbeingLoading = false,
+                    screenTimePermissionGranted = true,
+                    wellbeingError = errorMessage,
+                    todayAppUsage = todayApps,
+                    todayCategoryUsage = repo.getCategoryWiseUsage(todayApps),
+                    weeklyAppUsage = weeklyApps,
+                    categoryUsage = repo.getCategoryWiseUsage(weeklyApps),
+                    hourlyPeakUsage = hourly,
+                    dayUsagePoints = trend,
+                    weeklyHeatmap = heatmap
+                )
+            }
         }
     }
 
