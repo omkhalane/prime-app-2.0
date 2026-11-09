@@ -29,6 +29,9 @@ object AlarmSoundManager {
     private var syntheticToneJob: Job? = null
     private var vibratorJob: Job? = null
     private var vibrator: Vibrator? = null
+    @Volatile private var activeRingtoneId: String = "zen_crystal"
+    @Volatile private var muted: Boolean = false
+    @Volatile var isSessionSoundEnabled: Boolean = true
     private val scope = CoroutineScope(Dispatchers.Default)
 
     val BUILT_IN_RINGTONES = listOf(
@@ -78,6 +81,8 @@ object AlarmSoundManager {
      */
     fun startAlarmRinging(context: Context, ringtoneId: String, ringtoneUriString: String?, vibrationEnabled: Boolean) {
         stopPlayback(context)
+        activeRingtoneId = ringtoneId
+        muted = false
 
         if (vibrationEnabled) {
             startVibration(context)
@@ -95,6 +100,7 @@ object AlarmSoundManager {
                     )
                     setDataSource(context, uri)
                     isLooping = true
+                    setVolume(if (muted) 0f else 1f, if (muted) 0f else 1f)
                     prepare()
                     start()
                 }
@@ -142,6 +148,20 @@ object AlarmSoundManager {
             playSyntheticToneOnce(option.id)
             delay(4000L)
             onFinished?.invoke()
+        }
+    }
+
+    /** Mute/unmute alarm audio without disabling vibration or dismissing the alarm. */
+    fun setMuted(context: Context, isMuted: Boolean) {
+        muted = isMuted
+        mediaPlayer?.setVolume(if (isMuted) 0f else 1f, if (isMuted) 0f else 1f)
+        if (mediaPlayer == null) {
+            if (isMuted) {
+                syntheticToneJob?.cancel()
+                syntheticToneJob = null
+            } else if (syntheticToneJob == null) {
+                startSyntheticToneLoop(activeRingtoneId)
+            }
         }
     }
 
@@ -270,6 +290,7 @@ object AlarmSoundManager {
      * Play a quick pleasant chime for Pomodoro session transitions (focus complete, break finished).
      */
     fun playSessionTransitionChime() {
+        if (!isSessionSoundEnabled) return
         scope.launch {
             playSyntheticToneOnce("zen_crystal")
         }
