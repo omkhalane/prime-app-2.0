@@ -137,7 +137,6 @@ class WellbeingRepository(private val context: Context) {
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
-        var sawOpenEvent = false
         var sawNotificationEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
@@ -148,7 +147,6 @@ class WellbeingRepository(private val context: Context) {
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> {
-                        sawOpenEvent = true
                         // Count an app becoming foreground, not every Activity resume
                         // inside the same app (which inflated the old "opens" metric).
                         if (previousForegroundPackage != pkg) {
