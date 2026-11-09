@@ -8,11 +8,17 @@ import com.example.vpn.repo.BlockingScheduleRepository
 import com.example.vpn.repo.BlocklistRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class BlockingManager private constructor(private val context: Context) {
 
@@ -30,7 +36,10 @@ class BlockingManager private constructor(private val context: Context) {
     }
 
     private val prefs: SharedPreferences = context.getSharedPreferences("prime_blocking_manager_prefs", Context.MODE_PRIVATE)
+    // Keep measured protection time beside PRIME's verified wellbeing counters.
+    private val wellbeingPrefs: SharedPreferences = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
+    @Volatile private var lastBlockingCheckpointMillis: Long? = null
 
     val blocklistRepo = BlocklistRepository(context)
     val analyticsRepo = BlockingAnalyticsRepository(context)
@@ -55,15 +64,74 @@ class BlockingManager private constructor(private val context: Context) {
     init {
         scope.launch {
             reconcileActiveRules()
+            while (isActive) {
+                delay(15_000L)
+                checkpointBlockingDuration()
+            }
         }
     }
 
     fun updateVpnRunningState(running: Boolean) {
         _isVpnRunning.value = running
+        checkpointBlockingDuration()
     }
 
     fun onVpnRevoked() {
         _isVpnRunning.value = false
+        checkpointBlockingDuration()
+    }
+
+    fun onAccessibilityServiceStateChanged(running: Boolean) {
+        OpalAccessibilityService.isServiceRunning = running
+        checkpointBlockingDuration()
+    }
+
+    /** Call after the effective app/domain block lists change. */
+    fun onBlockingTargetsChanged() {
+        checkpointBlockingDuration()
+    }
+
+    /**
+     * Count only while a configured target is protected by a running enforcement service.
+     * Checkpointing every 15 seconds limits lost time if Android kills the process.
+     */
+    @Synchronized
+    private fun checkpointBlockingDuration() {
+        val now = System.currentTimeMillis()
+        val appProtectionActive = OpalAccessibilityService.blockedPackages.isNotEmpty() &&
+            OpalAccessibilityService.isServiceRunning
+        val websiteProtectionActive = OpalAccessibilityService.blockedWebsites.isNotEmpty() &&
+            (PrimeVpnService.isServiceRunning || OpalAccessibilityService.isServiceRunning)
+        val actuallyEnforced = OpalAccessibilityService.isBlockingActive &&
+            (appProtectionActive || websiteProtectionActive)
+
+        val previous = lastBlockingCheckpointMillis
+        if (previous != null && now > previous) {
+            addMeasuredBlockingInterval(previous, now)
+        }
+        lastBlockingCheckpointMillis = if (actuallyEnforced) now else null
+    }
+
+    private fun addMeasuredBlockingInterval(startMillis: Long, endMillis: Long) {
+        var cursor = startMillis
+        while (cursor < endMillis) {
+            val dayStart = Calendar.getInstance().apply {
+                timeInMillis = cursor
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val nextDay = (dayStart.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, 1)
+            }.timeInMillis
+            val segmentEnd = minOf(endMillis, nextDay)
+            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(cursor))
+            val key = "verified_block_ms_$dateKey"
+            val current = wellbeingPrefs.getLong(key, 0L)
+            wellbeingPrefs.edit().putLong(key, current + (segmentEnd - cursor)).apply()
+            cursor = segmentEnd
+        }
     }
 
     fun onDomainBlocked(domain: String, category: String, reason: String) {
@@ -90,6 +158,7 @@ class BlockingManager private constructor(private val context: Context) {
         _activeRulesCount.value = activeMap.size
         // Synchronize in-browser interceptor rules
         OpalAccessibilityService.updateBlockedWebsites(activeMap.keys, activeMap)
+        checkpointBlockingDuration()
         activeMap
     }
 
@@ -113,6 +182,7 @@ class BlockingManager private constructor(private val context: Context) {
             }
             context.startService(intent)
         }
+        checkpointBlockingDuration()
     }
 
     fun togglePermanentProtection(enabled: Boolean) {
@@ -157,5 +227,6 @@ class BlockingManager private constructor(private val context: Context) {
         sessionBlockedCategories.clear()
         PrimeVpnService.stopService(context)
         _isVpnRunning.value = false
+        checkpointBlockingDuration()
     }
 }
