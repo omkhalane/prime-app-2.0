@@ -577,7 +577,7 @@ fun WeeklyAverageBarChart(dailyTimes: List<Long>, dailyAvgMs: Long) {
             )
         }
 
-        // 7 Bars
+        // Bars for elapsed days only
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -606,7 +606,7 @@ fun WeeklyAverageBarChart(dailyTimes: List<Long>, dailyAvgMs: Long) {
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            dayLabels.forEach { label ->
+            dayLabels.take(dailyTimes.size).forEach { label ->
                 Text(
                     text = label,
                     color = PrimeTextTertiary,
