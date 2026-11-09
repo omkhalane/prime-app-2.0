@@ -303,7 +303,6 @@ object RealScreenTimeTracker {
                 ApplicationInfo.CATEGORY_NEWS -> return "News"
                 ApplicationInfo.CATEGORY_MAPS -> return "Maps"
                 ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "Productivity"
-                ApplicationInfo.CATEGORY_ACCESSIBILITY -> return "Accessibility"
             }
         }
         val lower = (name + " " + pkg).lowercase()
