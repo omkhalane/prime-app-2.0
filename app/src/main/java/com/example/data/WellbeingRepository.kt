@@ -427,7 +427,8 @@ class WellbeingRepository(private val context: Context) {
             val dayEnd = minOf(cal.timeInMillis, System.currentTimeMillis())
 
             var dayScreenTime = 0L
-            var dayOpens = 0
+            var dayNotifications = 0
+            var dayUnlocks = 0
 
             if (dayStart <= System.currentTimeMillis()) {
                 try {
@@ -444,16 +445,6 @@ class WellbeingRepository(private val context: Context) {
                     }
                 } catch (_: Exception) { }
 
-                try {
-                    val events = sm.queryEvents(dayStart, dayEnd)
-                    val event = UsageEvents.Event()
-                    while (events.hasNextEvent()) {
-                        events.getNextEvent(event)
-                        if (event.packageName == context.packageName) continue
-                        if (event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                            dayOpens++
-                        }
-                    }
                 } catch (_: Exception) { }
             }
 
@@ -462,8 +453,8 @@ class WellbeingRepository(private val context: Context) {
                     dayLabel = dayLabels[dow],
                     dayIndex = dow,
                     screenTimeMs = dayScreenTime,
-                    notifications = 0,
-                    unlocks = (dayOpens / 3).coerceAtLeast(if (dayScreenTime > 0) 1 else 0),
+                    notifications = dayNotifications,
+                    unlocks = dayUnlocks,
                     isToday = (dow == todayDow)
                 )
             )
@@ -482,8 +473,10 @@ class WellbeingRepository(private val context: Context) {
         val appName = getAppName(packageName)
         val dailyTimes = mutableListOf<Long>()
         val dailyOpens = mutableListOf<Int>()
+        val dailyNotifications = mutableListOf<Int>()
         var totalWeeklyMs = 0L
         var totalWeeklyOpens = 0
+        var totalWeeklyNotifications = 0
 
         for (dow in 0..6) {
             val cal = Calendar.getInstance().apply {
@@ -500,6 +493,7 @@ class WellbeingRepository(private val context: Context) {
 
             var dayMs = 0L
             var opens = 0
+            var notifications = 0
 
             if (dayStart <= System.currentTimeMillis()) {
                 try {
@@ -518,8 +512,11 @@ class WellbeingRepository(private val context: Context) {
                     val event = UsageEvents.Event()
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
-                        if (event.packageName == packageName && event.eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
-                            opens++
+                        if (event.packageName == packageName) {
+                            when (event.eventType) {
+                                UsageEvents.Event.ACTIVITY_RESUMED -> opens++
+                                12 -> notifications++
+                            }
                         }
                     }
                 } catch (_: Exception) { }
@@ -527,8 +524,10 @@ class WellbeingRepository(private val context: Context) {
 
             dailyTimes.add(dayMs)
             dailyOpens.add(opens)
+            dailyNotifications.add(notifications)
             totalWeeklyMs += dayMs
             totalWeeklyOpens += opens
+            totalWeeklyNotifications += notifications
         }
 
         val dailyAvgMs = totalWeeklyMs / 7
@@ -540,12 +539,12 @@ class WellbeingRepository(private val context: Context) {
                 appName = appName,
                 weeklyTotalTimeMs = totalWeeklyMs,
                 dailyAvgTimeMs = dailyAvgMs,
-                weeklyNotifications = 0,
-                dailyAvgNotifications = 0,
+                weeklyNotifications = totalWeeklyNotifications,
+                dailyAvgNotifications = totalWeeklyNotifications / 7,
                 weeklyAppOpens = totalWeeklyOpens,
                 dailyAvgAppOpens = dailyAvgOpens,
                 dailyScreenTime = dailyTimes,
-                dailyNotifications = List(7) { 0 },
+                dailyNotifications = dailyNotifications,
                 dailyAppOpens = dailyOpens
             )
         )
