@@ -15,10 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
 class BlockingManager private constructor(private val context: Context) {
 
@@ -102,10 +98,12 @@ class BlockingManager private constructor(private val context: Context) {
     @Synchronized
     private fun checkpointBlockingDuration() {
         val now = System.currentTimeMillis()
-        val appProtectionActive = OpalAccessibilityService.blockedPackages.isNotEmpty() &&
-            OpalAccessibilityService.isServiceRunning
-        val websiteProtectionActive = OpalAccessibilityService.blockedWebsites.isNotEmpty() &&
-            (PrimeVpnService.isServiceRunning || OpalAccessibilityService.isServiceRunning)
+        val appProtectionActive = OpalAccessibilityService.blockedPackages.any {
+            !OpalAccessibilityService.isPackageSnoozed(it)
+        } && OpalAccessibilityService.isServiceRunning
+        val websiteProtectionActive = OpalAccessibilityService.blockedWebsites.any {
+            !OpalAccessibilityService.isWebsiteSnoozed(it)
+        } && (PrimeVpnService.isServiceRunning || OpalAccessibilityService.isServiceRunning)
         val actuallyEnforced = OpalAccessibilityService.isBlockingActive &&
             (appProtectionActive || websiteProtectionActive)
 
@@ -117,24 +115,10 @@ class BlockingManager private constructor(private val context: Context) {
     }
 
     private fun addMeasuredBlockingInterval(startMillis: Long, endMillis: Long) {
-        var cursor = startMillis
-        while (cursor < endMillis) {
-            val dayStart = Calendar.getInstance().apply {
-                timeInMillis = cursor
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
-            val nextDay = (dayStart.clone() as Calendar).apply {
-                add(Calendar.DAY_OF_YEAR, 1)
-            }.timeInMillis
-            val segmentEnd = minOf(endMillis, nextDay)
-            val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(cursor))
-            val key = "verified_block_ms_$dateKey"
+        BlockingDurationSlices.split(startMillis, endMillis).forEach { slice ->
+            val key = "verified_block_ms_${slice.dateKey}"
             val current = wellbeingPrefs.getLong(key, 0L)
-            wellbeingPrefs.edit().putLong(key, current + (segmentEnd - cursor)).apply()
-            cursor = segmentEnd
+            wellbeingPrefs.edit().putLong(key, current + slice.durationMillis).apply()
         }
     }
 
