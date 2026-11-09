@@ -745,6 +745,8 @@ class OpalRepository(private val context: Context? = null) {
             ?.apply()
     }
 
+    fun getSavedStandardTimerPaused(): Boolean = prefs?.getBoolean("clock_timer_paused", false) ?: false
+
     fun getSavedStandardTimerState(): Triple<Int, Int, Boolean> {
         val selected = (prefs?.getInt("clock_timer_selected", 30) ?: 30).coerceIn(1, 24 * 60)
         val running = prefs?.getBoolean("clock_timer_running", false) ?: false
@@ -970,6 +972,9 @@ class OpalRepository(private val context: Context? = null) {
                 put("remaining_seconds", state.remainingSeconds)
                 put("total_session_seconds", state.totalSessionSeconds)
                 put("completed_rounds", state.completedRoundsCount)
+                put("is_running", state.isRunning)
+                put("is_paused", state.isPaused)
+                put("deadline_ms", if (state.isRunning && !state.isPaused) System.currentTimeMillis() + state.remainingSeconds.coerceAtLeast(0) * 1000L else 0L)
             }
             prefs?.edit()?.putString("pomodoro_state_json", obj.toString())?.apply()
         } catch (_: Throwable) { }
@@ -985,7 +990,16 @@ class OpalRepository(private val context: Context? = null) {
                 currentCycle = obj.optInt("current_cycle", 1),
                 remainingSeconds = obj.optInt("remaining_seconds", 25 * 60),
                 totalSessionSeconds = obj.optInt("total_session_seconds", 25 * 60),
-                completedRoundsCount = obj.optInt("completed_rounds", 0)
+                completedRoundsCount = obj.optInt("completed_rounds", 0),
+                isRunning = obj.optBoolean("is_running", false),
+                isPaused = obj.optBoolean("is_paused", false),
+                remainingSeconds = run {
+                    val stored = obj.optInt("remaining_seconds", 25 * 60).coerceAtLeast(0)
+                    val deadline = obj.optLong("deadline_ms", 0L)
+                    if (obj.optBoolean("is_running", false) && !obj.optBoolean("is_paused", false) && deadline > 0L) {
+                        ((deadline - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(0)
+                    } else stored
+                }
             )
         } catch (_: Throwable) {
             PomodoroState()
