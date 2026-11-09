@@ -7,6 +7,7 @@ import com.example.model.BlockedAppItem
 import com.example.model.TimerPreset
 import com.example.model.UserProfile
 import com.example.model.AlarmItem
+import com.example.model.ClockPreferences
 import com.example.model.AlarmMode
 import com.example.model.AlarmRecurrence
 import com.example.model.ChallengeCategory
@@ -207,6 +208,9 @@ class OpalRepository(private val context: Context? = null) {
             alarmMode = AlarmMode.NORMAL
         )
     )
+
+    private val _clockPreferencesFlow = MutableStateFlow(loadClockPreferences())
+    val clockPreferencesFlow: StateFlow<ClockPreferences> = _clockPreferencesFlow.asStateFlow()
 
     private val _alarmsFlow = MutableStateFlow(loadSavedAlarms())
     val alarmsFlow: StateFlow<List<AlarmItem>> = _alarmsFlow.asStateFlow()
@@ -693,6 +697,89 @@ class OpalRepository(private val context: Context? = null) {
         syncAccessibilityBlockList()
     }
 
+    // ==================== CLOCK PREFERENCES ====================
+
+    fun saveClockPreferences(value: ClockPreferences) {
+        val safe = value.copy(
+            alarmVolume = value.alarmVolume.coerceIn(0, 100),
+            alarmWallpaper = value.alarmWallpaper.takeIf { it in setOf("aurora", "sunrise", "forest", "ocean", "minimal") } ?: "aurora",
+            timerTheme = value.timerTheme.takeIf { it in setOf("midnight", "ember", "ocean", "forest", "lavender") } ?: "midnight"
+        )
+        _clockPreferencesFlow.value = safe
+        prefs?.edit()
+            ?.putString("clock_default_ringtone_id", safe.defaultRingtoneId)
+            ?.putString("clock_default_ringtone_name", safe.defaultRingtoneName)
+            ?.putString("clock_default_ringtone_uri", safe.defaultRingtoneUriString)
+            ?.putString("clock_alarm_wallpaper", safe.alarmWallpaper)
+            ?.putString("clock_timer_theme", safe.timerTheme)
+            ?.putBoolean("clock_alarm_fade_in", safe.alarmFadeIn)
+            ?.putBoolean("clock_alarm_vibration", safe.alarmVibration)
+            ?.putInt("clock_alarm_volume", safe.alarmVolume)
+            ?.putBoolean("clock_session_sounds", safe.sessionSoundsEnabled)
+            ?.apply()
+    }
+
+    private fun loadClockPreferences(): ClockPreferences = ClockPreferences(
+        defaultRingtoneId = prefs?.getString("clock_default_ringtone_id", "zen_crystal") ?: "zen_crystal",
+        defaultRingtoneName = prefs?.getString("clock_default_ringtone_name", "Zen Crystal Chime") ?: "Zen Crystal Chime",
+        defaultRingtoneUriString = prefs?.getString("clock_default_ringtone_uri", null),
+        alarmWallpaper = prefs?.getString("clock_alarm_wallpaper", "aurora") ?: "aurora",
+        timerTheme = prefs?.getString("clock_timer_theme", "midnight") ?: "midnight",
+        alarmFadeIn = prefs?.getBoolean("clock_alarm_fade_in", true) ?: true,
+        alarmVibration = prefs?.getBoolean("clock_alarm_vibration", true) ?: true,
+        alarmVolume = (prefs?.getInt("clock_alarm_volume", 85) ?: 85).coerceIn(0, 100),
+        sessionSoundsEnabled = prefs?.getBoolean("clock_session_sounds", true) ?: true
+    )
+
+    // Standard timer uses an absolute deadline so it survives activity/process recreation.
+    fun saveStandardTimerState(remainingSeconds: Int, selectedMinutes: Int, running: Boolean, paused: Boolean) {
+        val remaining = remainingSeconds.coerceIn(0, 24 * 60 * 60)
+        val selected = selectedMinutes.coerceIn(1, 24 * 60)
+        val active = running && !paused
+        prefs?.edit()
+            ?.putInt("clock_timer_remaining", remaining)
+            ?.putInt("clock_timer_selected", selected)
+            ?.putBoolean("clock_timer_running", running)
+            ?.putBoolean("clock_timer_paused", paused)
+            ?.putLong("clock_timer_deadline", if (active) System.currentTimeMillis() + remaining * 1000L else 0L)
+            ?.apply()
+    }
+
+    fun getSavedStandardTimerPaused(): Boolean = prefs?.getBoolean("clock_timer_paused", false) ?: false
+
+    fun getSavedStandardTimerState(): Triple<Int, Int, Boolean> {
+        val selected = (prefs?.getInt("clock_timer_selected", 30) ?: 30).coerceIn(1, 24 * 60)
+        val running = prefs?.getBoolean("clock_timer_running", false) ?: false
+        val paused = prefs?.getBoolean("clock_timer_paused", false) ?: false
+        val stored = (prefs?.getInt("clock_timer_remaining", selected * 60) ?: selected * 60).coerceAtLeast(0)
+        val deadline = prefs?.getLong("clock_timer_deadline", 0L) ?: 0L
+        val remaining = if (running && !paused && deadline > 0L) {
+            ((deadline - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(0)
+        } else stored
+        return Triple(remaining, selected, running && remaining > 0)
+    }
+
+    fun clearStandardTimerState(selectedMinutes: Int = 30) {
+        val selected = selectedMinutes.coerceIn(1, 24 * 60)
+        saveStandardTimerState(selected * 60, selected, false, false)
+    }
+
+    // Stopwatch is based on wall-clock elapsed time, not a coroutine tick counter.
+    fun saveStopwatchState(elapsedMillis: Long, running: Boolean) {
+        prefs?.edit()
+            ?.putLong("clock_stopwatch_elapsed", elapsedMillis.coerceAtLeast(0L))
+            ?.putLong("clock_stopwatch_started_at", if (running) System.currentTimeMillis() else 0L)
+            ?.putBoolean("clock_stopwatch_running", running)
+            ?.apply()
+    }
+
+    fun getSavedStopwatchState(): Pair<Long, Boolean> {
+        val elapsed = (prefs?.getLong("clock_stopwatch_elapsed", 0L) ?: 0L).coerceAtLeast(0L)
+        val startedAt = prefs?.getLong("clock_stopwatch_started_at", 0L) ?: 0L
+        val running = prefs?.getBoolean("clock_stopwatch_running", false) ?: false
+        return (if (running && startedAt > 0L) elapsed + (System.currentTimeMillis() - startedAt).coerceAtLeast(0L) else elapsed) to running
+    }
+
     // ==================== ALARM PERSISTENCE ====================
 
     fun saveAlarm(alarm: AlarmItem) {
@@ -865,11 +952,11 @@ class OpalRepository(private val context: Context? = null) {
         return try {
             val obj = JSONObject(jsonStr)
             PomodoroSettings(
-                focusMinutes = obj.optInt("focus_minutes", 25),
-                shortBreakMinutes = obj.optInt("short_break_minutes", 5),
-                longBreakMinutes = obj.optInt("long_break_minutes", 15),
-                roundsPerCycle = obj.optInt("rounds_per_cycle", 4),
-                totalCycles = obj.optInt("total_cycles", 1)
+                focusMinutes = obj.optInt("focus_minutes", 25).coerceIn(1, 180),
+                shortBreakMinutes = obj.optInt("short_break_minutes", 5).coerceIn(1, 60),
+                longBreakMinutes = obj.optInt("long_break_minutes", 15).coerceIn(1, 120),
+                roundsPerCycle = obj.optInt("rounds_per_cycle", 4).coerceIn(1, 12),
+                totalCycles = obj.optInt("total_cycles", 1).coerceIn(1, 20)
             )
         } catch (_: Throwable) {
             PomodoroSettings()
@@ -886,6 +973,9 @@ class OpalRepository(private val context: Context? = null) {
                 put("remaining_seconds", state.remainingSeconds)
                 put("total_session_seconds", state.totalSessionSeconds)
                 put("completed_rounds", state.completedRoundsCount)
+                put("is_running", state.isRunning)
+                put("is_paused", state.isPaused)
+                put("deadline_ms", if (state.isRunning && !state.isPaused) System.currentTimeMillis() + state.remainingSeconds.coerceAtLeast(0) * 1000L else 0L)
             }
             prefs?.edit()?.putString("pomodoro_state_json", obj.toString())?.apply()
         } catch (_: Throwable) { }
@@ -899,9 +989,17 @@ class OpalRepository(private val context: Context? = null) {
                 sessionType = PomodoroSessionType.valueOf(obj.optString("session_type", "FOCUS")),
                 currentRound = obj.optInt("current_round", 1),
                 currentCycle = obj.optInt("current_cycle", 1),
-                remainingSeconds = obj.optInt("remaining_seconds", 25 * 60),
                 totalSessionSeconds = obj.optInt("total_session_seconds", 25 * 60),
-                completedRoundsCount = obj.optInt("completed_rounds", 0)
+                completedRoundsCount = obj.optInt("completed_rounds", 0),
+                isRunning = obj.optBoolean("is_running", false),
+                isPaused = obj.optBoolean("is_paused", false),
+                remainingSeconds = run {
+                    val stored = obj.optInt("remaining_seconds", 25 * 60).coerceAtLeast(0)
+                    val deadline = obj.optLong("deadline_ms", 0L)
+                    if (obj.optBoolean("is_running", false) && !obj.optBoolean("is_paused", false) && deadline > 0L) {
+                        ((deadline - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(0)
+                    } else stored
+                }
             )
         } catch (_: Throwable) {
             PomodoroState()

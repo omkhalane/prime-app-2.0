@@ -29,6 +29,11 @@ object AlarmSoundManager {
     private var syntheticToneJob: Job? = null
     private var vibratorJob: Job? = null
     private var vibrator: Vibrator? = null
+    private var fadeJob: Job? = null
+    @Volatile private var outputGain: Float = 0.85f
+    @Volatile private var activeRingtoneId: String = "zen_crystal"
+    @Volatile private var muted: Boolean = false
+    @Volatile var isSessionSoundEnabled: Boolean = true
     private val scope = CoroutineScope(Dispatchers.Default)
 
     val BUILT_IN_RINGTONES = listOf(
@@ -78,6 +83,12 @@ object AlarmSoundManager {
      */
     fun startAlarmRinging(context: Context, ringtoneId: String, ringtoneUriString: String?, vibrationEnabled: Boolean) {
         stopPlayback(context)
+        activeRingtoneId = ringtoneId
+        muted = false
+        val prefs = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+        val targetGain = prefs.getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f
+        val fadeIn = prefs.getBoolean("clock_alarm_fade_in", true)
+        outputGain = if (fadeIn) 0f else targetGain
 
         if (vibrationEnabled) {
             startVibration(context)
@@ -95,16 +106,41 @@ object AlarmSoundManager {
                     )
                     setDataSource(context, uri)
                     isLooping = true
+                    setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
                     prepare()
                     start()
                 }
+                if (fadeIn) {
+                    fadeJob?.cancel()
+                    fadeJob = scope.launch {
+                        for (step in 1..12) {
+                            if (!isActive || muted) break
+                            val gain = targetGain * step / 12f
+                            outputGain = gain
+                            mediaPlayer?.setVolume(gain, gain)
+                            delay(500L)
+                        }
+                    }
+                }
                 return
             } catch (_: Throwable) {
-                // Fall back to synthetic tone if URI cannot be played
+                // Release a partially initialized player before falling back.
+                try { mediaPlayer?.release() } catch (_: Throwable) { }
+                mediaPlayer = null
             }
         }
 
         startSyntheticToneLoop(ringtoneId)
+        if (fadeIn) {
+            fadeJob?.cancel()
+            fadeJob = scope.launch {
+                for (step in 1..12) {
+                    if (!isActive || muted) break
+                    outputGain = targetGain * step / 12f
+                    delay(500L)
+                }
+            }
+        }
     }
 
     /**
@@ -145,8 +181,31 @@ object AlarmSoundManager {
         }
     }
 
+    /** Mute/unmute alarm audio without disabling vibration or dismissing the alarm. */
+    fun setMuted(context: Context, isMuted: Boolean) {
+        muted = isMuted
+        if (isMuted) {
+            fadeJob?.cancel()
+            fadeJob = null
+        } else {
+            outputGain = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+                .getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f
+        }
+        mediaPlayer?.setVolume(if (isMuted) 0f else outputGain, if (isMuted) 0f else outputGain)
+        if (mediaPlayer == null) {
+            if (isMuted) {
+                syntheticToneJob?.cancel()
+                syntheticToneJob = null
+            } else if (syntheticToneJob == null) {
+                startSyntheticToneLoop(activeRingtoneId)
+            }
+        }
+    }
+
     fun stopPlayback(context: Context) {
         try {
+            fadeJob?.cancel()
+            fadeJob = null
             syntheticToneJob?.cancel()
             syntheticToneJob = null
 
@@ -235,7 +294,7 @@ object AlarmSoundManager {
                 }
                 // Fundamental + rich 2nd harmonic
                 val sample = (sin(2.0 * PI * freq * t) * 0.7 + sin(4.0 * PI * freq * t) * 0.3) * envelope
-                audioData[startIndex + j] = (sample * 28000).toInt().toShort()
+                audioData[startIndex + j] = (sample * 28000 * outputGain * if (muted) 0f else 1f).toInt().toShort()
             }
         }
 
@@ -270,6 +329,7 @@ object AlarmSoundManager {
      * Play a quick pleasant chime for Pomodoro session transitions (focus complete, break finished).
      */
     fun playSessionTransitionChime() {
+        if (!isSessionSoundEnabled) return
         scope.launch {
             playSyntheticToneOnce("zen_crystal")
         }

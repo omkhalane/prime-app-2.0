@@ -11,6 +11,7 @@ import com.example.data.HourlyPeakUsage
 import com.example.data.OpalRepository
 import com.example.data.WellbeingRepository
 import com.example.model.BlockRule
+import com.example.model.ClockPreferences
 import com.example.model.BlockedAppItem
 import com.example.model.NavigationTab
 import com.example.model.OnboardingStep
@@ -27,6 +28,8 @@ import com.example.data.PrimeAchievementRepository
 import com.example.data.PrimeScoreCalculator
 import com.example.ui.screens.BlockedAppActivity
 import com.example.util.PermissionHelper
+import com.example.alarm.AlarmSoundManager
+import com.example.alarm.ClockTimerReceiver
 import com.example.vpn.db.BlockedDomainEntity
 import com.example.vpn.db.CategoryEntity
 import com.example.vpn.db.BlockingScheduleEntity
@@ -84,6 +87,7 @@ data class OpalUiState(
     // Timer Tools Subscreens
     val activeTimerTool: TimerToolSubscreen = TimerToolSubscreen.NONE,
     val alarms: List<AlarmItem> = emptyList(),
+    val clockPreferences: ClockPreferences = ClockPreferences(),
     val pomodoroSettings: PomodoroSettings = PomodoroSettings(),
     val pomodoroState: PomodoroState = PomodoroState(),
     val stopwatchState: StopwatchState = StopwatchState(),
@@ -178,9 +182,14 @@ class OpalViewModel(
             presets = repository.presetsFlow.value,
             profile = repository.profileFlow.value,
             alarms = repository.alarmsFlow.value,
+            clockPreferences = repository.clockPreferencesFlow.value,
+            timerRemainingSeconds = repository.getSavedStandardTimerState().first,
+            timerSelectedMinutes = repository.getSavedStandardTimerState().second,
+            isTimerRunning = repository.getSavedStandardTimerState().third,
+            isTimerPaused = repository.getSavedStandardTimerPaused(),
+            stopwatchState = run { val saved = repository.getSavedStopwatchState(); StopwatchState(isRunning = saved.second, elapsedMillis = saved.first, laps = repository.stopwatchLapsFlow.value) },
             pomodoroSettings = repository.pomodoroSettingsFlow.value,
             pomodoroState = repository.pomodoroStateFlow.value,
-            stopwatchState = StopwatchState(laps = repository.stopwatchLapsFlow.value),
             isOnboarding = !repository.isRealOnboardingCompleted(),
             overlayPermissionGranted = context?.let { PermissionHelper.hasOverlayPermission(it) } ?: false,
             screenTimePermissionGranted = context?.let { PermissionHelper.hasUsageAccessPermission(it) } ?: false,
@@ -228,6 +237,36 @@ class OpalViewModel(
         }
         viewModelScope.launch {
             repository.alarmsFlow.collect { alarms -> _uiState.update { it.copy(alarms = alarms) } }
+        }
+        viewModelScope.launch {
+            repository.clockPreferencesFlow.collect { preferences ->
+                AlarmSoundManager.isSessionSoundEnabled = preferences.sessionSoundsEnabled
+                _uiState.update { it.copy(clockPreferences = preferences) }
+            }
+        }
+        if (_uiState.value.isTimerRunning) {
+            startRecoveredTimerLoop()
+            context?.let { ctx ->
+                ClockTimerReceiver.schedule(ctx, _uiState.value.timerRemainingSeconds * 1000L, "Focus timer complete", "Your focus session is finished. Take a mindful break.")
+            }
+        }
+        if (_uiState.value.pomodoroState.isRunning && !_uiState.value.pomodoroState.isPaused) {
+            launchPomodoroLoop()
+            context?.let { ctx ->
+                ClockTimerReceiver.schedule(
+                    ctx,
+                    _uiState.value.pomodoroState.remainingSeconds.coerceAtLeast(1) * 1000L,
+                    "Pomodoro session complete",
+                    "Your ${_uiState.value.pomodoroState.sessionType.displayName.lowercase()} session is finished.",
+                    _uiState.value.clockPreferences.sessionSoundsEnabled
+                )
+            }
+        }
+        if (_uiState.value.stopwatchState.isRunning) {
+            val saved = repository.getSavedStopwatchState()
+            stopwatchBaseElapsed = saved.first
+            stopwatchStartTime = System.currentTimeMillis()
+            launchStopwatchLoop()
         }
         viewModelScope.launch {
             repository.pomodoroSettingsFlow.collect { settings -> _uiState.update { it.copy(pomodoroSettings = settings) } }
@@ -537,6 +576,7 @@ class OpalViewModel(
             timerSelectedMinutes = updated,
             timerRemainingSeconds = updated * 60
         )
+        repository.saveStandardTimerState(updated * 60, updated, false, false)
     }
 
     fun toggleTimerBlockApps() {
@@ -587,7 +627,7 @@ class OpalViewModel(
     ) {
         val resolvedPreset = preset ?: _uiState.value.presets.firstOrNull { it.title.equals(presetTitle, ignoreCase = true) }
         val title = resolvedPreset?.title ?: presetTitle
-        val minutes = customMinutes ?: (resolvedPreset?.durationMinutes ?: _uiState.value.timerSelectedMinutes)
+        val minutes = (customMinutes ?: (resolvedPreset?.durationMinutes ?: _uiState.value.timerSelectedMinutes)).coerceIn(1, 24 * 60)
         timerJob?.cancel()
         _uiState.value = _uiState.value.copy(
             timerSelectedMinutes = minutes,
@@ -599,6 +639,9 @@ class OpalViewModel(
             isQuickFocusSheetOpen = false,
             selectedTimerPreset = null
         )
+
+        repository.saveStandardTimerState(minutes * 60, minutes, true, false)
+        context?.let { ClockTimerReceiver.schedule(it, minutes * 60_000L, "Focus timer complete", "Your focus session is finished. Take a mindful break.") }
 
         // Enforce session app blocking
         if (_uiState.value.timerBlockAppsEnabled) {
@@ -629,6 +672,8 @@ class OpalViewModel(
                     if (remaining <= 0) {
                         val completedMin = _uiState.value.timerSelectedMinutes
                         repository.addFocusMinutes(completedMin)
+                        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+                        context?.let { ClockTimerReceiver.cancel(it) }
                         _uiState.value = _uiState.value.copy(
                             timerRemainingSeconds = 0,
                             isTimerRunning = false,
@@ -656,6 +701,7 @@ class OpalViewModel(
                         }
                     } else {
                         _uiState.value = _uiState.value.copy(timerRemainingSeconds = remaining)
+                        repository.saveStandardTimerState(remaining, _uiState.value.timerSelectedMinutes, true, false)
                     }
                 }
             }
@@ -663,11 +709,24 @@ class OpalViewModel(
     }
 
     fun pauseTimer() {
-        _uiState.value = _uiState.value.copy(isTimerPaused = !_uiState.value.isTimerPaused)
+        val paused = !_uiState.value.isTimerPaused
+        _uiState.value = _uiState.value.copy(isTimerPaused = paused)
+        context?.let { ctx ->
+            if (paused) ClockTimerReceiver.cancel(ctx)
+            else ClockTimerReceiver.schedule(ctx, _uiState.value.timerRemainingSeconds * 1000L, "Focus timer complete", "Your focus session is finished. Take a mindful break.")
+        }
+        repository.saveStandardTimerState(
+            _uiState.value.timerRemainingSeconds,
+            _uiState.value.timerSelectedMinutes,
+            _uiState.value.isTimerRunning,
+            paused
+        )
     }
 
     fun stopTimer() {
         timerJob?.cancel()
+        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+        context?.let { ClockTimerReceiver.cancel(it) }
         // Automatically unblock session-blocked apps and websites when session is stopped
         repository.clearTimerSessionAppBlock()
         blockingManager?.onFocusSessionEnded()
@@ -677,6 +736,43 @@ class OpalViewModel(
             timerRemainingSeconds = _uiState.value.timerSelectedMinutes * 60,
             activePresetTitle = null,
             activePreset = null
+        )
+    }
+
+    private fun startRecoveredTimerLoop() {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            while (_uiState.value.isTimerRunning && _uiState.value.timerRemainingSeconds > 0) {
+                delay(1000L)
+                if (!_uiState.value.isTimerPaused) {
+                    val remaining = repository.getSavedStandardTimerState().first
+                    if (remaining <= 0) {
+                        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+                        context?.let { ClockTimerReceiver.cancel(it) }
+                        repository.clearTimerSessionAppBlock()
+                        blockingManager?.onFocusSessionEnded()
+                        _uiState.value = _uiState.value.copy(
+                            isTimerRunning = false,
+                            isTimerPaused = false,
+                            timerRemainingSeconds = 0,
+                            activePresetTitle = null,
+                            activePreset = null,
+                            snackbarMessage = "Focus session completed!"
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(timerRemainingSeconds = remaining)
+                    }
+                }
+            }
+        }
+    }
+
+    fun saveClockPreferences(preferences: ClockPreferences) {
+        repository.saveClockPreferences(preferences)
+        AlarmSoundManager.isSessionSoundEnabled = preferences.sessionSoundsEnabled
+        _uiState.value = _uiState.value.copy(
+            clockPreferences = preferences,
+            snackbarMessage = "Clock settings saved"
         )
     }
 
@@ -707,7 +803,14 @@ class OpalViewModel(
         _uiState.value = _uiState.value.copy(isPomodoroSettingsOpen = false)
     }
 
-    fun savePomodoroSettings(settings: PomodoroSettings) {
+    fun savePomodoroSettings(requestedSettings: PomodoroSettings) {
+        val settings = requestedSettings.copy(
+            focusMinutes = requestedSettings.focusMinutes.coerceIn(1, 180),
+            shortBreakMinutes = requestedSettings.shortBreakMinutes.coerceIn(1, 60),
+            longBreakMinutes = requestedSettings.longBreakMinutes.coerceIn(1, 120),
+            roundsPerCycle = requestedSettings.roundsPerCycle.coerceIn(1, 12),
+            totalCycles = requestedSettings.totalCycles.coerceIn(1, 20)
+        )
         repository.updatePomodoroSettings(settings)
         val currentState = _uiState.value.pomodoroState
         val newDuration = if (!currentState.isRunning) {
@@ -750,6 +853,7 @@ class OpalViewModel(
         )
         _uiState.value = _uiState.value.copy(pomodoroState = runningState)
         repository.savePomodoroState(runningState)
+        context?.let { ClockTimerReceiver.schedule(it, targetSeconds * 1000L, "Pomodoro session complete", "Your ${current.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
 
         launchPomodoroLoop()
     }
@@ -758,17 +862,20 @@ class OpalViewModel(
         val updated = _uiState.value.pomodoroState.copy(isPaused = true)
         _uiState.value = _uiState.value.copy(pomodoroState = updated)
         repository.savePomodoroState(updated)
+        context?.let { ClockTimerReceiver.cancel(it) }
     }
 
     fun resumePomodoro() {
         val updated = _uiState.value.pomodoroState.copy(isPaused = false)
         _uiState.value = _uiState.value.copy(pomodoroState = updated)
         repository.savePomodoroState(updated)
+        context?.let { ClockTimerReceiver.schedule(it, updated.remainingSeconds * 1000L, "Pomodoro session complete", "Your ${updated.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
         launchPomodoroLoop()
     }
 
     fun resetPomodoro() {
         pomodoroJob?.cancel()
+        context?.let { ClockTimerReceiver.cancel(it) }
         val settings = _uiState.value.pomodoroSettings
         val resetState = PomodoroState(
             sessionType = PomodoroSessionType.FOCUS,
@@ -905,6 +1012,20 @@ class OpalViewModel(
                 }
             }
         }
+        val nextPomodoro = _uiState.value.pomodoroState
+        context?.let { ctx ->
+            if (nextPomodoro.isRunning && !nextPomodoro.isPaused) {
+                ClockTimerReceiver.schedule(
+                    ctx,
+                    nextPomodoro.remainingSeconds.coerceAtLeast(1) * 1000L,
+                    "Pomodoro session complete",
+                    "Your ${nextPomodoro.sessionType.displayName.lowercase()} session is finished.",
+                    _uiState.value.clockPreferences.sessionSoundsEnabled
+                )
+            } else {
+                ClockTimerReceiver.cancel(ctx)
+            }
+        }
     }
 
     // ==================== STOPWATCH CONTROLS ===================
@@ -912,6 +1033,8 @@ class OpalViewModel(
     fun startStopwatch() {
         stopwatchStartTime = System.currentTimeMillis()
         stopwatchBaseElapsed = 0L
+        repository.saveStopwatchState(0L, true)
+        repository.saveStopwatchLaps(emptyList())
         _uiState.value = _uiState.value.copy(
             stopwatchState = _uiState.value.stopwatchState.copy(
                 isRunning = true,
@@ -927,6 +1050,7 @@ class OpalViewModel(
         val now = System.currentTimeMillis()
         val totalElapsed = stopwatchBaseElapsed + (now - stopwatchStartTime)
         stopwatchBaseElapsed = totalElapsed
+        repository.saveStopwatchState(totalElapsed, false)
         _uiState.value = _uiState.value.copy(
             stopwatchState = _uiState.value.stopwatchState.copy(
                 isRunning = false,
@@ -937,6 +1061,7 @@ class OpalViewModel(
 
     fun resumeStopwatch() {
         stopwatchStartTime = System.currentTimeMillis()
+        repository.saveStopwatchState(stopwatchBaseElapsed, true)
         _uiState.value = _uiState.value.copy(
             stopwatchState = _uiState.value.stopwatchState.copy(isRunning = true)
         )
@@ -946,6 +1071,7 @@ class OpalViewModel(
     fun resetStopwatch() {
         stopwatchJob?.cancel()
         stopwatchBaseElapsed = 0L
+        repository.saveStopwatchState(0L, false)
         val resetState = StopwatchState(
             isRunning = false,
             elapsedMillis = 0L,
@@ -988,12 +1114,17 @@ class OpalViewModel(
     // ==================== ALARM ACTIONS ====================
 
     fun openCreateAlarm() {
+        val defaults = _uiState.value.clockPreferences
         val blankAlarm = AlarmItem(
             id = "alarm_${System.currentTimeMillis()}",
             hour = 7,
             minute = 0,
             name = "Morning Alarm",
-            isEnabled = true
+            isEnabled = true,
+            ringtoneId = defaults.defaultRingtoneId,
+            ringtoneName = defaults.defaultRingtoneName,
+            ringtoneUriString = defaults.defaultRingtoneUriString,
+            vibrationEnabled = defaults.alarmVibration
         )
         _uiState.value = _uiState.value.copy(
             isCreatingAlarm = true,
@@ -1018,7 +1149,14 @@ class OpalViewModel(
     }
 
     fun saveAlarm(alarm: AlarmItem) {
-        repository.saveAlarm(alarm)
+        repository.saveAlarm(alarm.copy(
+            hour = alarm.hour.coerceIn(0, 23),
+            minute = alarm.minute.coerceIn(0, 59),
+            name = alarm.name.trim().take(40).ifBlank { "Alarm" },
+            snoozeDurationMinutes = alarm.snoozeDurationMinutes.coerceIn(1, 30),
+            selectedDays = alarm.selectedDays.filter { it in 1..7 }.toSet().ifEmpty { setOf(1, 2, 3, 4, 5) },
+            challengeConfig = alarm.challengeConfig.copy(requiredConsecutive = alarm.challengeConfig.requiredConsecutive.coerceIn(1, 5))
+        ))
         _uiState.value = _uiState.value.copy(
             isCreatingAlarm = false,
             editingAlarm = null,

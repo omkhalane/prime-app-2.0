@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,14 +63,54 @@ import com.example.ui.theme.OpalTextSecondary
 @Composable
 fun RingtoneSelectionSheet(
     selectedRingtoneId: String,
+    selectedRingtoneUriString: String? = null,
+    selectedRingtoneName: String? = null,
     onDismiss: () -> Unit,
     onSelectRingtone: (RingtoneOption) -> Unit
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val ringtones = remember { AlarmSoundManager.getAvailableRingtones(context) }
+    val deviceRingtones = remember { AlarmSoundManager.getAvailableRingtones(context) }
+    val ringtones = remember(deviceRingtones, selectedRingtoneId, selectedRingtoneUriString, selectedRingtoneName) {
+        if (selectedRingtoneUriString != null && deviceRingtones.none { it.id == selectedRingtoneId }) {
+            deviceRingtones + RingtoneOption(
+                id = selectedRingtoneId,
+                title = selectedRingtoneName ?: "Imported alarm sound",
+                uriString = selectedRingtoneUriString,
+                isSynthetic = false
+            )
+        } else deviceRingtones
+    }
     var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
+
+    val importAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {
+                // Some document providers do not offer persistable grants.
+            }
+            val displayName = runCatching {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+            }.getOrNull()?.takeIf { it.isNotBlank() } ?: "Imported alarm sound"
+            val option = RingtoneOption(
+                id = "imported_${uri.toString().hashCode()}",
+                title = displayName,
+                uriString = uri.toString(),
+                isSynthetic = false
+            )
+            onSelectRingtone(option)
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -127,10 +173,55 @@ fun RingtoneSelectionSheet(
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
             )
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF302342))
+                        .clickable { importAudioLauncher.launch(arrayOf("audio/*")) }
+                        .padding(horizontal = 12.dp, vertical = 13.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Import audio", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF20242B))
+                        .clickable {
+                            val spotifyIntent = Intent(Intent.ACTION_VIEW, Uri.parse("spotify:search:alarm%20music"))
+                            try {
+                                context.startActivity(spotifyIntent)
+                            } catch (_: Exception) {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/search/alarm%20music"))
+                                )
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 13.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Explore Spotify", color = Color(0xFF1ED760), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+
+            Text(
+                text = "Imported audio is played from this device. Spotify opens for browsing; Spotify tracks cannot be assigned as a native alarm tone by this app.",
+                color = OpalTextSecondary,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+            )
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(380.dp),
+                    .height(340.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(ringtones) { ringtone ->

@@ -60,3 +60,17 @@ data class AlarmItem(
     val alarmMode: AlarmMode = AlarmMode.NORMAL,
     val challengeConfig: ChallengeConfig = ChallengeConfig()
 )
+
+
+/** Persisted defaults shared by the alarm, timer and ringing experiences. */
+data class ClockPreferences(
+    val defaultRingtoneId: String = "zen_crystal",
+    val defaultRingtoneName: String = "Zen Crystal Chime",
+    val defaultRingtoneUriString: String? = null,
+    val alarmWallpaper: String = "aurora",
+    val timerTheme: String = "midnight",
+    val alarmFadeIn: Boolean = true,
+    val alarmVibration: Boolean = true,
+    val alarmVolume: Int = 85,
+    val sessionSoundsEnabled: Boolean = true
+)

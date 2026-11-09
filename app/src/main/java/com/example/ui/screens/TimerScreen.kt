@@ -130,6 +130,26 @@ fun TimerScreen(
                 .align(Alignment.TopCenter)
         )
 
+        // Global timer theme tint (preset artwork remains visible beneath it).
+        val timerThemeTint = when (uiState.clockPreferences.timerTheme) {
+            "ember" -> Color(0xFFB94D35)
+            "ocean" -> Color(0xFF1686A0)
+            "forest" -> Color(0xFF38856A)
+            "lavender" -> Color(0xFF8060B3)
+            else -> Color(0xFF34415D)
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(340.dp)
+                .align(Alignment.TopCenter)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(timerThemeTint.copy(alpha = 0.26f), Color.Transparent)
+                    )
+                )
+        )
+
         // Gradient fade
         Box(
             modifier = Modifier

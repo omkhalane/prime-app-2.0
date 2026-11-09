@@ -568,6 +568,7 @@ fun OpalApp() {
                     PomodoroScreen(
                         state = uiState.pomodoroState,
                         settings = uiState.pomodoroSettings,
+                        themeId = uiState.clockPreferences.timerTheme,
                         onBack = { viewModel.closeTimerTool() },
                         onStart = { viewModel.startPomodoro() },
                         onPause = { viewModel.pausePomodoro() },
@@ -596,6 +597,7 @@ fun OpalApp() {
                         elapsedMillis = uiState.stopwatchState.elapsedMillis,
                         isRunning = uiState.stopwatchState.isRunning,
                         laps = uiState.stopwatchState.laps,
+                        themeId = uiState.clockPreferences.timerTheme,
                         onBack = { viewModel.closeTimerTool() },
                         onStart = { viewModel.startStopwatch() },
                         onPause = { viewModel.pauseStopwatch() },
@@ -613,7 +615,9 @@ fun OpalApp() {
                         onAddNewAlarm = { viewModel.openCreateAlarm() },
                         onEditAlarm = { viewModel.openEditAlarm(it) },
                         onToggleAlarm = { id, enabled -> viewModel.toggleAlarm(id, enabled) },
-                        onDeleteAlarm = { viewModel.deleteAlarm(it) }
+                        onDeleteAlarm = { viewModel.deleteAlarm(it) },
+                        clockPreferences = uiState.clockPreferences,
+                        onSaveClockPreferences = { viewModel.saveClockPreferences(it) }
                     )
                 }
 
@@ -636,6 +640,8 @@ fun OpalApp() {
                 if (uiState.isRingtonePickerOpen) {
                     RingtoneSelectionSheet(
                         selectedRingtoneId = uiState.editingAlarm?.ringtoneId ?: "zen_crystal",
+                        selectedRingtoneUriString = uiState.editingAlarm?.ringtoneUriString,
+                        selectedRingtoneName = uiState.editingAlarm?.ringtoneName,
                         onDismiss = { viewModel.closeRingtonePicker() },
                         onSelectRingtone = { viewModel.selectRingtone(it) }
                     )

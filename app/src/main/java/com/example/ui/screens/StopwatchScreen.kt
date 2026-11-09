@@ -69,6 +69,7 @@ fun StopwatchScreen(
     onResume: () -> Unit,
     onReset: () -> Unit,
     onLap: () -> Unit,
+    themeId: String = "midnight",
     modifier: Modifier = Modifier
 ) {
     val fastestLapNumber = if (laps.size >= 2) {
@@ -91,10 +92,17 @@ fun StopwatchScreen(
     }
     val centisFormatted = String.format(".%02d", centis)
 
+    val themeBackground = when (themeId) {
+        "ember" -> listOf(Color(0xFF241719), Color(0xFF351C20), PrimeBackground)
+        "ocean" -> listOf(Color(0xFF102B3B), Color(0xFF173C4B), PrimeBackground)
+        "forest" -> listOf(Color(0xFF15352B), Color(0xFF1E493A), PrimeBackground)
+        "lavender" -> listOf(Color(0xFF2D2144), Color(0xFF392B55), PrimeBackground)
+        else -> listOf(Color(0xFF101827), Color(0xFF1B2638), PrimeBackground)
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(PrimeBackground)
+            .background(Brush.verticalGradient(themeBackground))
     ) {
         Column(
             modifier = Modifier
