@@ -14,11 +14,13 @@ import com.example.MainActivity
 
 /** Keeps timer-completion audio alive after the broadcast receiver returns. */
 class ClockTimerAlertService : Service() {
+    private var ownsPlayback = false
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            AlarmSoundManager.stopPlayback(this)
+            if (ownsPlayback) AlarmSoundManager.stopPlayback(this)
+            ownsPlayback = false
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -72,6 +74,7 @@ class ClockTimerAlertService : Service() {
         startForeground(NOTIFICATION_ID, notification)
         if (soundEnabled) {
             AlarmSoundManager.startAlarmRinging(this, ringtoneId, ringtoneUri, vibration)
+            ownsPlayback = true
             return START_STICKY
         } else {
             stopForeground(STOP_FOREGROUND_DETACH)
@@ -81,7 +84,7 @@ class ClockTimerAlertService : Service() {
     }
 
     override fun onDestroy() {
-        AlarmSoundManager.stopPlayback(this)
+        if (ownsPlayback) AlarmSoundManager.stopPlayback(this)
         super.onDestroy()
     }
 
