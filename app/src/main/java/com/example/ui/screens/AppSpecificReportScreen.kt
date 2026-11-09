@@ -189,7 +189,7 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyScreenTime.mapIndexed { i, time ->
+                    dataPoints = metric.dailyScreenTime.take(todayDow + 1).mapIndexed { i, time ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
@@ -262,7 +262,7 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyNotifications.mapIndexed { i, count ->
+                    dataPoints = metric.dailyNotifications.take(todayDow + 1).mapIndexed { i, count ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
@@ -334,7 +334,7 @@ fun AppSpecificReportScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 SingleColorBarChart(
-                    dataPoints = metric.dailyAppOpens.mapIndexed { i, count ->
+                    dataPoints = metric.dailyAppOpens.take(todayDow + 1).mapIndexed { i, count ->
                         DayUsagePoint(
                             dayLabel = listOf("S", "M", "T", "W", "T", "F", "S")[i],
                             dayIndex = i,
