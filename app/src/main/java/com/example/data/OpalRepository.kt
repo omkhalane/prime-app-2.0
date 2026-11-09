@@ -958,6 +958,12 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun getTodayBlockingMinutes(): Int {
+        // Flush the live interval so dashboard reads do not lag behind the 15-second checkpoint.
+        context?.let { ctx ->
+            try {
+                com.example.vpn.service.BlockingManager.getInstance(ctx).flushBlockingDuration()
+            } catch (_: Exception) { }
+        }
         // Milliseconds are accumulated only while a real enforcement service is active
         // with at least one configured app or website target.
         val measuredMillis = prefs?.getLong("verified_block_ms_${getTodayDateKey()}", 0L) ?: 0L
