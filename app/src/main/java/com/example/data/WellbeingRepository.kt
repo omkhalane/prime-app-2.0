@@ -406,10 +406,10 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
 
+                var sawDailyEvent = false
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
-                    var sawDailyEvent = false
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
                         sawDailyEvent = true
@@ -484,10 +484,10 @@ class WellbeingRepository(private val context: Context) {
                     return@withContext Result.failure(e)
                 }
 
+                var sawAppEvent = false
                 try {
                     val events = sm.queryEvents(dayStart, dayEnd)
                     val event = UsageEvents.Event()
-                    var sawAppEvent = false
                     while (events.hasNextEvent()) {
                         events.getNextEvent(event)
                         if (event.packageName == packageName) {
