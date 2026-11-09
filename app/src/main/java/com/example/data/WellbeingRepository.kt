@@ -110,7 +110,6 @@ class WellbeingRepository(private val context: Context) {
 
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
-        val packagesWithEvents = mutableSetOf<String>()
         var previousForegroundPackage: String? = null
 
         val calendar = Calendar.getInstance().apply {
@@ -147,7 +146,6 @@ class WellbeingRepository(private val context: Context) {
                 events.getNextEvent(event)
                 val pkg = event.packageName ?: continue
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
-                packagesWithEvents.add(pkg)
                 when (event.eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> {
                         sawOpenEvent = true
@@ -173,8 +171,7 @@ class WellbeingRepository(private val context: Context) {
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (sawOpenEvent) openCounts[pkg] ?: 0 else null
+            val opens = openCounts[pkg]
             val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
