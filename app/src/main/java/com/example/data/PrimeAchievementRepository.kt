@@ -196,7 +196,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
         return SimpleDateFormat("yyyy-'W'ww", Locale.US).format(calendar.time)
     }
 
-    fun updateDailyProgress(screenMinutes: Int?, completedFocusSessions: Int, blockingMinutes: Int) {
+    fun updateDailyProgress(screenMinutes: Int?, completedPomodoroSessions: Int, blockingMinutes: Int) {
         val screenTarget = _targetsFlow.value.screenTimeTargetMinutes
         val updated = _dailyQuestsFlow.value.map { quest ->
             when (quest.id) {
@@ -207,9 +207,9 @@ class PrimeAchievementRepository(private val context: Context? = null) {
                     isCompleted = screenMinutes != null && screenMinutes <= screenTarget
                 )
                 "quest_pomodoro" -> quest.copy(
-                    currentProgress = completedFocusSessions.coerceAtLeast(0),
+                    currentProgress = completedPomodoroSessions.coerceAtLeast(0),
                     targetProgress = 2,
-                    isCompleted = completedFocusSessions >= 2
+                    isCompleted = completedPomodoroSessions >= 2
                 )
                 "quest_blocking" -> quest.copy(
                     currentProgress = blockingMinutes.coerceAtLeast(0),
