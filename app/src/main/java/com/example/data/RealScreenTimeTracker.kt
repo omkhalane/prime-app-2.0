@@ -1,6 +1,5 @@
 package com.example.data
 
-import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -139,67 +138,10 @@ object RealScreenTimeTracker {
                             usageStatsMap[pkg] = stat.totalTimeInForeground
                         }
                     }
-                } catch (_: Exception) {}
-
-                // Secondary: Precise event verification handling screen-off and lock
-                try {
-                    val events = usageStatsManager.queryEvents(startTime, endTime)
-                    val event = UsageEvents.Event()
-                    var currentResumedPkg: String? = null
-                    var currentResumedTime: Long = 0L
-
-                    while (events.hasNextEvent()) {
-                        events.getNextEvent(event)
-                        val pkg = event.packageName ?: continue
-                        val time = event.timeStamp
-                        if (time < startTime || time > endTime) continue
-
-                        val isIgnored = isIgnoredPackage(context, pkg, homePackages)
-
-                        when (event.eventType) {
-                            UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
-                                if (currentResumedPkg != null && currentResumedTime > 0 && currentResumedPkg != pkg) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                                    usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
-                                }
-                                if (!isIgnored) {
-                                    currentResumedPkg = pkg
-                                    currentResumedTime = time
-                                } else {
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
-                            }
-                            UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED, 2, 23 -> {
-                                if (currentResumedPkg == pkg && currentResumedTime > 0) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[pkg] ?: 0L
-                                    usageStatsMap[pkg] = maxOf(current, duration)
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
-                            }
-                            // SCREEN_NON_INTERACTIVE (16), KEYGUARD_SHOWN (17), DEVICE_SHUTDOWN (26)
-                            16, 17, 26 -> {
-                                if (currentResumedPkg != null && currentResumedTime > 0) {
-                                    val duration = (time - currentResumedTime).coerceIn(0L, 2 * 60 * 60 * 1000L)
-                                    val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                                    usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
-                                    currentResumedPkg = null
-                                    currentResumedTime = 0L
-                                }
-                            }
-                        }
-                    }
-
-                    if (currentResumedPkg != null && currentResumedTime > 0) {
-                        val duration = (endTime - currentResumedTime).coerceIn(0L, 10 * 60 * 1000L)
-                        val current = usageStatsMap[currentResumedPkg!!] ?: 0L
-                        usageStatsMap[currentResumedPkg!!] = maxOf(current, duration)
-                    }
                 } catch (e: Exception) {
-                    fetchError = "Error querying usage events: ${e.message}"
+                    fetchError = "Unable to read Android usage statistics: ${e.message}"
+                }
+
                 }
             } else {
                 fetchError = "UsageStatsManager system service not available on device."
@@ -224,15 +166,10 @@ object RealScreenTimeTracker {
 
             val usageMillis = usageStatsMap[pkg] ?: 0L
             val isAllowed = isAlwaysAllowedApp(appName, pkg)
-            val isKnownDistracting = !isAllowed && (isDistractingApp(appName, pkg) || true)
             val primeCategory = if (isAllowed) "Always allowed" else "Distracting"
             val wellbeingCategory = getDigitalWellbeingCategory(context, pkg, appName)
 
-            val isBlocked = if (existingBlockedIds.isNotEmpty()) {
-                existingBlockedIds.contains(pkg)
-            } else {
-                primeCategory == "Distracting"
-            }
+            val isBlocked = existingBlockedIds.contains(pkg)
 
             val usageText = when {
                 !hasPermission -> "Not tracked yet"
@@ -288,22 +225,9 @@ object RealScreenTimeTracker {
         // 5. Calculate normalized PRIME score (0-1000 points)
         val minutesToday = (totalForegroundMillis / (1000 * 60)).toInt()
 
-        // Effective focus minutes: verified timer minutes, or mindful baseline when screen time is under control
-        val effectiveFocusMin = if (verifiedFocusMinutes > 0) {
-            verifiedFocusMinutes
-        } else {
-            if (minutesToday in 1..180) {
-                val ratio = 1f - (minutesToday.toFloat() / 270f).coerceIn(0f, 1f)
-                (ratio * 90).toInt().coerceAtLeast(35)
-            } else 40
-        }
-
-        // Effective blocking minutes: verified blocked minutes, or active shield protection
-        val effectiveBlockedMin = if (verifiedBlockedMinutes > 0) {
-            verifiedBlockedMinutes
-        } else {
-            if (existingBlockedIds.isNotEmpty()) 120 else 60
-        }
+        // Only completed, verified sessions contribute to focus and blocking scores.
+        val effectiveFocusMin = verifiedFocusMinutes.coerceAtLeast(0)
+        val effectiveBlockedMin = verifiedBlockedMinutes.coerceAtLeast(0)
 
         val screenTimeScore = PrimeScoreCalculator.calculateScreenTimeScore(
             actualMinutes = minutesToday,
