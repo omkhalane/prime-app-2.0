@@ -800,7 +800,7 @@ private fun QuestCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = { (progress.toFloat() / target.toFloat()).coerceIn(0f, 1f) },
+                    progress = { if (progress >= 0) (progress.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f },
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .height(5.dp)
@@ -810,7 +810,7 @@ private fun QuestCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$progress / $target $unit",
+                    text = if (progress >= 0) "$progress / $target $unit" else "Usage data unavailable",
                     color = OpalTextSecondary,
                     fontSize = 10.sp
                 )
