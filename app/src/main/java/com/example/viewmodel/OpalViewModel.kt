@@ -563,6 +563,7 @@ class OpalViewModel(
             timerSelectedMinutes = updated,
             timerRemainingSeconds = updated * 60
         )
+        repository.saveStandardTimerState(updated * 60, updated, false, false)
     }
 
     fun toggleTimerBlockApps() {
@@ -657,7 +658,7 @@ class OpalViewModel(
                     if (remaining <= 0) {
                         val completedMin = _uiState.value.timerSelectedMinutes
                         repository.addFocusMinutes(completedMin)
-                        repository.clearStandardTimerState()
+                        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
                         _uiState.value = _uiState.value.copy(
                             timerRemainingSeconds = 0,
                             isTimerRunning = false,
@@ -782,7 +783,15 @@ class OpalViewModel(
     }
 
     fun savePomodoroSettings(settings: PomodoroSettings) {
-        repository.updatePomodoroSettings(settings)
+        val safeSettings = settings.copy(
+            focusMinutes = settings.focusMinutes.coerceIn(1, 180),
+            shortBreakMinutes = settings.shortBreakMinutes.coerceIn(1, 60),
+            longBreakMinutes = settings.longBreakMinutes.coerceIn(1, 120),
+            roundsPerCycle = settings.roundsPerCycle.coerceIn(1, 12),
+            totalCycles = settings.totalCycles.coerceIn(1, 20)
+        )
+        repository.updatePomodoroSettings(safeSettings)
+        val settings = safeSettings
         val currentState = _uiState.value.pomodoroState
         val newDuration = if (!currentState.isRunning) {
             when (currentState.sessionType) {
