@@ -72,11 +72,12 @@ class ClockTimerAlertService : Service() {
         startForeground(NOTIFICATION_ID, notification)
         if (soundEnabled) {
             AlarmSoundManager.startAlarmRinging(this, ringtoneId, ringtoneUri, vibration)
+            return START_STICKY
         } else {
             stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
+            return START_NOT_STICKY
         }
-        return START_STICKY
     }
 
     override fun onDestroy() {
