@@ -14,6 +14,8 @@ import java.util.Calendar
 
 // Android exposes this UsageEvents event as a @SystemApi, so keep its stable
 // platform event value here instead of referencing a non-SDK constant.
+private const val USAGE_EVENT_END_OF_DAY = 3
+private const val USAGE_EVENT_CONTINUE_PREVIOUS_DAY = 4
 private const val USAGE_EVENT_NOTIFICATION_INTERRUPTION = 12
 
 data class AppUsageData(
@@ -609,7 +611,7 @@ class WellbeingRepository(private val context: Context) {
                             }
                         }
                     }
-                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                    UsageEvents.Event.ACTIVITY_PAUSED, USAGE_EVENT_END_OF_DAY -> {
                         if (pkg != null && activePackage == pkg) closeActive(timestamp)
                     }
                     UsageEvents.Event.SCREEN_NON_INTERACTIVE, UsageEvents.Event.KEYGUARD_SHOWN -> {
