@@ -108,15 +108,19 @@ object RealScreenTimeTracker {
         val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
         }
+        var fetchError: String? = null
         val resolveInfos: List<ResolveInfo> = try {
             pm.queryIntentActivities(launcherIntent, 0)
         } catch (e: Exception) {
+            fetchError = "Unable to list launchable apps: ${e.message}"
             emptyList()
+        }
+        if (resolveInfos.isEmpty() && fetchError == null) {
+            fetchError = "Android did not return any launchable apps; screen-time totals are unavailable."
         }
 
         // 3. Query UsageStats strictly for Today (midnight to now)
         val usageStatsMap = mutableMapOf<String, Long>()
-        var fetchError: String? = null
 
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -133,9 +137,13 @@ object RealScreenTimeTracker {
                 // Primary: Authoritative aggregated stats from Android System
                 try {
                     val aggregated = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
-                    aggregated?.forEach { (pkg, stat) ->
-                        if (!isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
-                            usageStatsMap[pkg] = stat.totalTimeInForeground
+                    if (aggregated == null) {
+                        fetchError = "Android returned no aggregated usage response."
+                    } else {
+                        aggregated.forEach { (pkg, stat) ->
+                            if (!isIgnoredPackage(context, pkg, homePackages) && stat.totalTimeInForeground > 0 && stat.lastTimeUsed >= startTime) {
+                                usageStatsMap[pkg] = stat.totalTimeInForeground
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -172,6 +180,7 @@ object RealScreenTimeTracker {
 
             val usageText = when {
                 !hasPermission -> "Not tracked yet"
+                fetchError != null -> "Usage data unavailable"
                 usageMillis > 0 -> formatDuration(usageMillis) + " today"
                 else -> "Not used today"
             }
@@ -215,10 +224,10 @@ object RealScreenTimeTracker {
         // Total screen time is strictly the sum of all foreground user apps used today (matching Digital Wellbeing)
         val totalForegroundMillis = realAppItems.sumOf { it.usageMillis }
 
-        val formattedTotal = if (totalForegroundMillis > 0) {
-            formatDuration(totalForegroundMillis)
-        } else {
-            "0m"
+        val formattedTotal = when {
+            fetchError != null -> "Unavailable"
+            totalForegroundMillis > 0 -> formatDuration(totalForegroundMillis)
+            else -> "0m"
         }
 
         // 5. Calculate normalized PRIME score (0-1000 points)
