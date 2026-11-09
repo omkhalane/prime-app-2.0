@@ -222,7 +222,7 @@ object RealScreenTimeTracker {
         }
 
         // Total screen time is strictly the sum of all foreground user apps used today (matching Digital Wellbeing)
-        val totalForegroundMillis = realAppItems.sumOf { it.usageMillis }
+        val totalForegroundMillis = if (fetchError == null) realAppItems.sumOf { it.usageMillis } else 0L
 
         val formattedTotal = when {
             fetchError != null -> "Unavailable"
