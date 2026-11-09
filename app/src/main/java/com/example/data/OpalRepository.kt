@@ -445,28 +445,26 @@ class OpalRepository(private val context: Context? = null) {
 
         val streakInfo = StreakTracker.getStreakInfo(context)
 
-        if (trackingResult.apps.isNotEmpty()) {
-            val categoryOverrides = getSavedCategoryOverrides()
-            val appsWithOverrides = trackingResult.apps.map { app ->
-                val overridden = categoryOverrides[app.id]
-                if (overridden != null) app.copy(category = overridden) else app
-            }
-            _appsFlow.value = appsWithOverrides
-            _profileFlow.update {
-                it.copy(
-                    screenTimeToday = trackingResult.totalScreenTimeFormatted,
-                    screenTimeMillis = trackingResult.totalScreenTimeMillis,
-                    score = trackingResult.score,
-                    sleepScore = trackingResult.sleepScore,
-                    focusScore = trackingResult.focusScore,
-                    restScore = trackingResult.restScore,
-                    streakDays = streakInfo.currentStreak,
-                    bestStreakDays = streakInfo.bestStreak,
-                    isActiveToday = streakInfo.isActiveToday,
-                    weekDaysActive = streakInfo.weekDaysActive,
-                    hasUsagePermission = trackingResult.hasUsagePermission
-                )
-            }
+        val categoryOverrides = getSavedCategoryOverrides()
+        val appsWithOverrides = trackingResult.apps.map { app ->
+            val overridden = categoryOverrides[app.id]
+            if (overridden != null) app.copy(category = overridden) else app
+        }
+        _appsFlow.value = appsWithOverrides
+        _profileFlow.update {
+            it.copy(
+                screenTimeToday = trackingResult.totalScreenTimeFormatted,
+                screenTimeMillis = trackingResult.totalScreenTimeMillis,
+                score = trackingResult.score,
+                sleepScore = trackingResult.sleepScore,
+                focusScore = trackingResult.focusScore,
+                restScore = trackingResult.restScore,
+                streakDays = streakInfo.currentStreak,
+                bestStreakDays = streakInfo.bestStreak,
+                isActiveToday = streakInfo.isActiveToday,
+                weekDaysActive = streakInfo.weekDaysActive,
+                hasUsagePermission = trackingResult.hasUsagePermission
+            )
         }
         syncAccessibilityBlockList()
     }
