@@ -138,6 +138,7 @@ class WellbeingRepository(private val context: Context) {
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
         var sawNotificationEvent = false
+        var eventQuerySucceeded = true
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -167,13 +168,13 @@ class WellbeingRepository(private val context: Context) {
                 }
             }
         } catch (_: Exception) {
-            // Android foreground durations remain valid; event counters stay null when unavailable.
+            eventQuerySucceeded = false
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
-            val opens = openCounts[pkg]
-            val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
+            val opens = if (eventQuerySucceeded) openCounts[pkg] else null
+            val notifications = if (eventQuerySucceeded && sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -231,6 +232,7 @@ class WellbeingRepository(private val context: Context) {
         val notificationCounts = mutableMapOf<String, Int>()
         var sawOpenEvent = false
         var sawNotificationEvent = false
+        var eventQuerySucceeded = true
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -262,7 +264,7 @@ class WellbeingRepository(private val context: Context) {
                 }
             }
         } catch (_: Exception) {
-            // Android foreground durations remain valid; event counters stay null when unavailable.
+            eventQuerySucceeded = false
         }
         val result = appMap.map { (pkg, duration) ->
             val appLabel = getAppName(pkg)
