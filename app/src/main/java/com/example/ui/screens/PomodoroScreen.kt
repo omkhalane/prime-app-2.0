@@ -32,12 +32,18 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Spa
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +59,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.alarm.AlarmSoundManager
 import com.example.model.PomodoroSessionType
 import com.example.model.PomodoroSettings
 import com.example.model.PomodoroState
@@ -87,6 +94,7 @@ fun PomodoroScreen(
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+    var sessionSoundEnabled by remember { mutableStateOf(AlarmSoundManager.isSessionSoundEnabled) }
 
     val sessionAccentColor = when (state.sessionType) {
         PomodoroSessionType.FOCUS -> Color(0xFFFF7043)
@@ -161,14 +169,28 @@ fun PomodoroScreen(
                     letterSpacing = (-0.3).sp
                 )
 
-                PrimeGlassIconButton(
-                    icon = Icons.Rounded.MoreVert,
-                    contentDescription = "Pomodoro Settings",
-                    onClick = onOpenSettings,
-                    containerSize = 40.dp,
-                    iconSize = 20.dp,
-                    testTag = "pomodoro_settings_menu_button"
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PrimeGlassIconButton(
+                        icon = if (sessionSoundEnabled) Icons.Rounded.VolumeUp else Icons.Rounded.VolumeOff,
+                        contentDescription = if (sessionSoundEnabled) "Mute session sounds" else "Enable session sounds",
+                        onClick = {
+                            sessionSoundEnabled = !sessionSoundEnabled
+                            AlarmSoundManager.isSessionSoundEnabled = sessionSoundEnabled
+                        },
+                        containerSize = 40.dp,
+                        iconSize = 20.dp,
+                        testTag = "pomodoro_sound_toggle"
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    PrimeGlassIconButton(
+                        icon = Icons.Rounded.MoreVert,
+                        contentDescription = "Pomodoro Settings",
+                        onClick = onOpenSettings,
+                        containerSize = 40.dp,
+                        iconSize = 20.dp,
+                        testTag = "pomodoro_settings_menu_button"
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
