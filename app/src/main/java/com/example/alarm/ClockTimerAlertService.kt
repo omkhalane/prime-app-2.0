@@ -38,6 +38,8 @@ class ClockTimerAlertService : Service() {
                 NotificationChannel(CHANNEL_ID, "Timer alerts", NotificationManager.IMPORTANCE_HIGH).apply {
                     description = "Countdown and Pomodoro completion alerts"
                     lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                    setSound(null, null)
+                    enableVibration(false)
                 }
             )
         }
