@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,15 +58,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.example.model.ClockPreferences
 import com.example.alarm.AlarmSoundManager
+import com.example.R
 
-private data class ClockThemeOption(val id: String, val title: String, val colors: List<Color>)
+private data class ClockThemeOption(val id: String, val title: String, val colors: List<Color>, val imageRes: Int? = null)
 
 private val alarmWallpapers = listOf(
-    ClockThemeOption("aurora", "Aurora", listOf(Color(0xFF16142E), Color(0xFF553B82), Color(0xFF101827))),
-    ClockThemeOption("sunrise", "Sunrise", listOf(Color(0xFF4D1F32), Color(0xFFB85C43), Color(0xFF24152E))),
-    ClockThemeOption("forest", "Forest", listOf(Color(0xFF102D27), Color(0xFF28705A), Color(0xFF101D25))),
-    ClockThemeOption("ocean", "Ocean", listOf(Color(0xFF10263D), Color(0xFF176A83), Color(0xFF101827))),
-    ClockThemeOption("minimal", "Minimal", listOf(Color(0xFF252832), Color(0xFF414653), Color(0xFF14161C)))
+    ClockThemeOption("aurora", "Aurora", listOf(Color(0xFF16142E), Color(0xFF553B82), Color(0xFF101827)), R.drawable.img_timer_hero),
+    ClockThemeOption("sunrise", "Sunrise", listOf(Color(0xFF4D1F32), Color(0xFFB85C43), Color(0xFF24152E)), R.drawable.img_preset_meeting),
+    ClockThemeOption("forest", "Forest", listOf(Color(0xFF102D27), Color(0xFF28705A), Color(0xFF101D25)), R.drawable.img_preset_nature),
+    ClockThemeOption("ocean", "Ocean", listOf(Color(0xFF10263D), Color(0xFF176A83), Color(0xFF101827)), R.drawable.img_preset_commute),
+    ClockThemeOption("minimal", "Minimal", listOf(Color(0xFF252832), Color(0xFF414653), Color(0xFF14161C)), R.drawable.img_preset_powernap)
 )
 
 private val timerThemes = listOf(
@@ -254,6 +258,15 @@ private fun ThemeSwatch(theme: ClockThemeOption, selected: Boolean, onClick: () 
                 .then(if (selected) Modifier.border(2.dp, Color.White, RoundedCornerShape(12.dp)) else Modifier),
             contentAlignment = Alignment.Center
         ) {
+            theme.imageRes?.let { imageRes ->
+                Image(
+                    painter = painterResource(imageRes),
+                    contentDescription = "${theme.title} alarm wallpaper",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                )
+                Box(Modifier.fillMaxWidth().height(48.dp).background(Brush.verticalGradient(theme.colors.map { it.copy(alpha = 0.38f) })))
+            }
             if (selected) Icon(Icons.Rounded.Check, null, tint = Color.White)
         }
         Text(theme.title, color = if (selected) Color.White else Color(0xFF9CA3AF), fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
