@@ -453,7 +453,7 @@ class OpalViewModel(
     private fun refreshAchievementProgress(screenMinutes: Int?) {
         achievementRepo.updateDailyProgress(
             screenMinutes = screenMinutes,
-            completedFocusSessions = repository.getTodayFocusSessions(),
+            completedPomodoroSessions = repository.getTodayPomodoroSessions(),
             blockingMinutes = repository.getTodayBlockingMinutes()
         )
         achievementRepo.updateWeeklyFocusProgress(repository.getWeekFocusSessions())
