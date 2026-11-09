@@ -322,6 +322,7 @@ class WellbeingRepository(private val context: Context) {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
         val now = System.currentTimeMillis()
+        val todayDow = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) - 1
         val segments = queryForegroundSegments(sm, weekStart, now, getHomePackages(), getLaunchablePackages())
             .getOrElse { return@withContext Result.failure(it) }
         val gridMillis = Array(7) { LongArray(24) }
@@ -340,14 +341,18 @@ class WellbeingRepository(private val context: Context) {
                 cursor = chunkEnd
             }
         }
-        val matrix = gridMillis.map { row ->
-            row.map { ms ->
-                val minutes = (ms / 60_000L).toInt()
-                when {
-                    minutes <= 0 -> 0
-                    minutes < 15 -> 1
-                    minutes < 30 -> 2
-                    else -> 3
+        val matrix = gridMillis.mapIndexed { dayIndex, row ->
+            if (dayIndex > todayDow) {
+                List(24) { -1 } // Future weekdays are not zero-usage observations.
+            } else {
+                row.map { ms ->
+                    val minutes = (ms / 60_000L).toInt()
+                    when {
+                        minutes <= 0 -> 0
+                        minutes < 15 -> 1
+                        minutes < 30 -> 2
+                        else -> 3
+                    }
                 }
             }
         }
