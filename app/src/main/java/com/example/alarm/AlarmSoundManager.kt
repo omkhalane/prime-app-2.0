@@ -86,8 +86,9 @@ object AlarmSoundManager {
         activeRingtoneId = ringtoneId
         muted = false
         val prefs = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
-        outputGain = (prefs.getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f)
+        val targetGain = prefs.getInt("clock_alarm_volume", 85).coerceIn(0, 100) / 100f
         val fadeIn = prefs.getBoolean("clock_alarm_fade_in", true)
+        outputGain = if (fadeIn) 0f else targetGain
 
         if (vibrationEnabled) {
             startVibration(context)
@@ -114,7 +115,8 @@ object AlarmSoundManager {
                     fadeJob = scope.launch {
                         for (step in 1..12) {
                             if (!isActive || muted) break
-                            val gain = outputGain * step / 12f
+                            val gain = targetGain * step / 12f
+                            outputGain = gain
                             mediaPlayer?.setVolume(gain, gain)
                             delay(500L)
                         }
@@ -127,6 +129,16 @@ object AlarmSoundManager {
         }
 
         startSyntheticToneLoop(ringtoneId)
+        if (fadeIn) {
+            fadeJob?.cancel()
+            fadeJob = scope.launch {
+                for (step in 1..12) {
+                    if (!isActive || muted) break
+                    outputGain = targetGain * step / 12f
+                    delay(500L)
+                }
+            }
+        }
     }
 
     /**
