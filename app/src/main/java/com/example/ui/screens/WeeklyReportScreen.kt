@@ -216,7 +216,7 @@ fun WeeklyReportScreen(
         ) {
             Column {
                 Text(
-                    text = RealScreenTimeTracker.formatDuration(dailyAvgMs),
+                    text = if (trendPoints.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(dailyAvgMs),
                     color = PrimeTextPrimary,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
@@ -274,7 +274,7 @@ fun WeeklyReportScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Favorite,
-                            contentDescription = "$topCategoryName Category",
+                            contentDescription = "${topCategoryName ?: "No usage data"} category",
                             tint = Color(0xFFFF6B6B),
                             modifier = Modifier.size(18.dp)
                         )
@@ -284,7 +284,7 @@ fun WeeklyReportScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = RealScreenTimeTracker.formatDuration(categoryTotalMs),
+                    text = if (weeklyApps.isEmpty()) "No data" else RealScreenTimeTracker.formatDuration(categoryTotalMs),
                     color = PrimeTextPrimary,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
