@@ -162,7 +162,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
         }
         _dailyQuestsFlow.value = updated
         val key = "claimed_daily_quests_${todayKey()}"
-        val claimed = prefs?.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
+        val claimed = prefs?.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         claimed.add(questId)
         val curXp = prefs?.getInt("bonus_xp", 0) ?: 0
         prefs?.edit()?.putStringSet(key, claimed)?.putInt("bonus_xp", curXp + quest.xpReward)?.apply()
@@ -178,7 +178,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
         }
         _weeklyMissionsFlow.value = updated
         val key = "claimed_weekly_missions_${weekKey()}"
-        val claimed = prefs?.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
+        val claimed = prefs?.getStringSet(key, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         claimed.add(missionId)
         val curXp = prefs?.getInt("bonus_xp", 0) ?: 0
         prefs?.edit()?.putStringSet(key, claimed)?.putInt("bonus_xp", curXp + mission.xpReward)?.apply()
@@ -236,7 +236,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     private fun loadDailyQuests(): List<DailyQuest> {
-        val claimedIds = prefs?.getStringSet("claimed_daily_quests_${todayKey()}", emptySet()).orEmpty()
+        val claimedIds = prefs?.getStringSet("claimed_daily_quests_${todayKey()}", mutableSetOf()).orEmpty()
         return listOf(
             DailyQuest(
                 id = "quest_screen_time",
@@ -275,7 +275,7 @@ class PrimeAchievementRepository(private val context: Context? = null) {
     }
 
     private fun loadWeeklyMissions(): List<WeeklyMission> {
-        val claimedIds = prefs?.getStringSet("claimed_weekly_missions_${weekKey()}", emptySet()).orEmpty()
+        val claimedIds = prefs?.getStringSet("claimed_weekly_missions_${weekKey()}", mutableSetOf()).orEmpty()
         return listOf(
             WeeklyMission(
                 id = "mission_elite_avg",
