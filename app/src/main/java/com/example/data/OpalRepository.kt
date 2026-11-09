@@ -759,8 +759,9 @@ class OpalRepository(private val context: Context? = null) {
         return Triple(remaining, selected, running && remaining > 0)
     }
 
-    fun clearStandardTimerState() {
-        saveStandardTimerState(0, 30, false, false)
+    fun clearStandardTimerState(selectedMinutes: Int = 30) {
+        val selected = selectedMinutes.coerceIn(1, 24 * 60)
+        saveStandardTimerState(selected * 60, selected, false, false)
     }
 
     // Stopwatch is based on wall-clock elapsed time, not a coroutine tick counter.
