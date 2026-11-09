@@ -228,10 +228,14 @@ object RealScreenTimeTracker {
         val effectiveFocusMin = verifiedFocusMinutes.coerceAtLeast(0)
         val effectiveBlockedMin = verifiedBlockedMinutes.coerceAtLeast(0)
 
-        val screenTimeScore = PrimeScoreCalculator.calculateScreenTimeScore(
-            actualMinutes = minutesToday,
-            targetMinutes = 180
-        )
+        val screenTimeScore = if (fetchError == null) {
+            PrimeScoreCalculator.calculateScreenTimeScore(
+                actualMinutes = minutesToday,
+                targetMinutes = 180
+            )
+        } else {
+            0f
+        }
         val focusScore = PrimeScoreCalculator.calculateFocusScore(
             verifiedFocusMinutes = effectiveFocusMin,
             targetFocusMinutes = 120
