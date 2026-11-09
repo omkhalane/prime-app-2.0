@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import com.example.util.PermissionHelper
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +111,7 @@ class WellbeingRepository(private val context: Context) {
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
         val packagesWithEvents = mutableSetOf<String>()
+        var previousForegroundPackage: String? = null
 
         val calendar = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 0)
@@ -136,6 +138,8 @@ class WellbeingRepository(private val context: Context) {
         // UsageEvents provide real event counters only; foreground duration is read from
         // Android's aggregate UsageStats API above, never reconstructed from partial sessions.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawOpenEvent = false
+        var sawNotificationEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -145,10 +149,22 @@ class WellbeingRepository(private val context: Context) {
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 packagesWithEvents.add(pkg)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
-                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        sawOpenEvent = true
+                        // Count an app becoming foreground, not every Activity resume
+                        // inside the same app (which inflated the old "opens" metric).
+                        if (previousForegroundPackage != pkg) {
+                            openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                        }
+                        previousForegroundPackage = pkg
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        if (previousForegroundPackage == pkg) previousForegroundPackage = null
+                    }
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
+                        sawNotificationEvent = true
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
+                    }
                 }
             }
         } catch (_: Exception) {
@@ -158,8 +174,8 @@ class WellbeingRepository(private val context: Context) {
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
             val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
-            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
+            val opens = if (sawOpenEvent) openCounts[pkg] ?: 0 else null
+            val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -185,6 +201,7 @@ class WellbeingRepository(private val context: Context) {
         val appMap = mutableMapOf<String, Long>()
         val openCounts = mutableMapOf<String, Int>()
         val packagesWithEvents = mutableSetOf<String>()
+        var previousForegroundPackage: String? = null
 
         val calendar = Calendar.getInstance().apply {
             firstDayOfWeek = Calendar.SUNDAY
@@ -214,6 +231,8 @@ class WellbeingRepository(private val context: Context) {
 
         // Count real opens and notification interruption events; do not infer either from time.
         val notificationCounts = mutableMapOf<String, Int>()
+        var sawOpenEvent = false
+        var sawNotificationEvent = false
         try {
             val events = sm.queryEvents(startTime, endTime)
             val event = UsageEvents.Event()
@@ -223,10 +242,22 @@ class WellbeingRepository(private val context: Context) {
                 if (RealScreenTimeTracker.isIgnoredPackage(context, pkg, homePackages)) continue
                 packagesWithEvents.add(pkg)
                 when (event.eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED ->
-                        openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
-                    USAGE_EVENT_NOTIFICATION_INTERRUPTION ->
+                    UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        sawOpenEvent = true
+                        // Count an app becoming foreground, not every Activity resume
+                        // inside the same app (which inflated the old "opens" metric).
+                        if (previousForegroundPackage != pkg) {
+                            openCounts[pkg] = (openCounts[pkg] ?: 0) + 1
+                        }
+                        previousForegroundPackage = pkg
+                    }
+                    UsageEvents.Event.ACTIVITY_PAUSED -> {
+                        if (previousForegroundPackage == pkg) previousForegroundPackage = null
+                    }
+                    USAGE_EVENT_NOTIFICATION_INTERRUPTION -> {
+                        sawNotificationEvent = true
                         notificationCounts[pkg] = (notificationCounts[pkg] ?: 0) + 1
+                    }
                 }
             }
         } catch (_: Exception) {
@@ -236,8 +267,8 @@ class WellbeingRepository(private val context: Context) {
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
             val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (hasEvents) openCounts[pkg] ?: 0 else null
-            val notifications = if (hasEvents) notificationCounts[pkg] ?: 0 else null
+            val opens = if (sawOpenEvent) openCounts[pkg] ?: 0 else null
+            val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
@@ -672,8 +703,32 @@ class WellbeingRepository(private val context: Context) {
         return com.example.util.formatAppName(raw)
     }
 
+    /**
+     * Prefer the category declared by the installed Android application.
+     * Name/package substring matching is only a fallback because it routinely
+     * misclassifies browsers, messaging clients and finance apps.
+     */
     private fun getAppCategory(packageName: String): String {
-        val appName = getAppName(packageName)
-        return RealScreenTimeTracker.getDigitalWellbeingCategory(context, packageName, appName)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val platformCategory = try {
+                packageManager.getApplicationInfo(packageName, 0).category
+            } catch (_: Exception) {
+                ApplicationInfo.CATEGORY_UNDEFINED
+            }
+            when (platformCategory) {
+                ApplicationInfo.CATEGORY_GAME -> return "Games"
+                ApplicationInfo.CATEGORY_AUDIO -> return "Audio"
+                ApplicationInfo.CATEGORY_VIDEO -> return "Video"
+                ApplicationInfo.CATEGORY_IMAGE -> return "Photos"
+                ApplicationInfo.CATEGORY_SOCIAL -> return "Social"
+                ApplicationInfo.CATEGORY_NEWS -> return "News"
+                ApplicationInfo.CATEGORY_MAPS -> return "Maps"
+                ApplicationInfo.CATEGORY_PRODUCTIVITY -> return "Productivity"
+                ApplicationInfo.CATEGORY_ACCESSIBILITY -> return "Accessibility"
+            }
+        }
+        return RealScreenTimeTracker.getDigitalWellbeingCategory(
+            context, packageName, getAppName(packageName)
+        )
     }
 }
