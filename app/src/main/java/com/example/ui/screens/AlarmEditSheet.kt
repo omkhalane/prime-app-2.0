@@ -90,6 +90,7 @@ fun AlarmEditSheet(
     var isAm by remember { mutableStateOf(initialAlarm.hour < 12) }
 
     var name by remember { mutableStateOf(initialAlarm.name) }
+    var validationError by remember { mutableStateOf<String?>(null) }
     var recurrence by remember { mutableStateOf(initialAlarm.recurrence) }
     var selectedDays by remember { mutableStateOf(initialAlarm.selectedDays) }
     var specificDateMillis by remember { mutableStateOf(initialAlarm.specificDateMillis) }
@@ -754,6 +755,15 @@ fun AlarmEditSheet(
             Spacer(modifier = Modifier.height(28.dp))
 
             // Action Buttons (Save & Cancel)
+            validationError?.let { error ->
+                Text(
+                    text = error,
+                    color = Color(0xFFFF8A80),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -789,7 +799,21 @@ fun AlarmEditSheet(
                                 isRandomizedCategory = randomizeCategory
                             )
                         )
-                        onSave(configured)
+                        val scheduledAt = specificDateMillis?.let { selectedDate ->
+                            Calendar.getInstance().apply {
+                                timeInMillis = selectedDate
+                                set(Calendar.HOUR_OF_DAY, hour.coerceIn(0, 23))
+                                set(Calendar.MINUTE, minute.coerceIn(0, 59))
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+                        }
+                        if (recurrence == AlarmRecurrence.ONCE && scheduledAt != null && scheduledAt <= System.currentTimeMillis()) {
+                            validationError = "Choose a future date and time for a one-time alarm."
+                        } else {
+                            validationError = null
+                            onSave(configured)
+                        }
                     },
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
