@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -130,7 +131,7 @@ fun ClockSettingsSheet(
         dragHandle = null
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp)
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Column {
@@ -182,6 +183,22 @@ fun ClockSettingsSheet(
                 }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF302B43))) { Text("Device tones", fontSize = 12.sp) }
                 Button(onClick = { importTonePicker.launch(arrayOf("audio/*")) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF302B43))) { Text("Import audio", fontSize = 12.sp) }
             }
+            Button(
+                onClick = {
+                    val spotify = Intent(Intent.ACTION_VIEW, Uri.parse("spotify:search:alarm%20music"))
+                    try {
+                        context.startActivity(spotify)
+                    } catch (_: Exception) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://open.spotify.com/search/alarm%20music")))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(top = 7.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF173B2C))
+            ) { Text("Explore Spotify alarm playlists", color = Color(0xFF1ED760), fontSize = 12.sp) }
+            Text(
+                "Spotify opens for discovery. Spotify does not expose a supported way for this app to assign protected tracks as native alarm audio; import a local audio file to use it.",
+                color = Color(0xFF8F96A3), fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp)
+            )
 
             Spacer(Modifier.height(18.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
