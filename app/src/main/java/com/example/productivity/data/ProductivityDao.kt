@@ -15,6 +15,9 @@ interface ProductivityDao {
     @Query("SELECT * FROM productivity_tasks WHERE id = :id LIMIT 1")
     suspend fun task(id: String): ProductivityTaskEntity?
 
+    @Query("SELECT COUNT(*) FROM productivity_tasks WHERE title = :title COLLATE NOCASE")
+    suspend fun countTasksWithTitle(title: String): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTask(task: ProductivityTaskEntity)
 
@@ -38,6 +41,9 @@ interface ProductivityDao {
 
     @Query("SELECT * FROM productivity_habits WHERE archived=0 ORDER BY createdAt")
     fun observeHabits(): Flow<List<ProductivityHabitEntity>>
+
+    @Query("SELECT COUNT(*) FROM productivity_habits WHERE title = :title COLLATE NOCASE AND archived=0")
+    suspend fun countHabitsWithTitle(title: String): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertHabit(habit: ProductivityHabitEntity)
