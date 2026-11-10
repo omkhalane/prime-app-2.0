@@ -9,7 +9,7 @@ Prime is being expanded from a digital-wellbeing and clock app into a privacy-fi
 - Alarm, countdown timer, Pomodoro and stopwatch experiences.
 - Alarm themes, ringtone selection/import, completion alerts and reboot restoration (PR #4 merged into main).
 - Prime score, achievements, streak and weekly-report foundations.
-- **New in this branch:** offline-first Daily Planner tasks and daily habit check-ins on the Home screen. Tasks persist locally; habit check-ins reset by local calendar day.
+- **New in this branch:** offline-first Daily Planner with user-created tasks and habits, completion toggles, deletion, duplicate/blank/length/count validation, local persistence and per-calendar-day habit check-ins. Fresh installs start with empty task and habit lists; no sample records are injected.
 
 ## Product modules and complete feature scope
 
@@ -67,6 +67,15 @@ Prime is being expanded from a digital-wellbeing and clock app into a privacy-fi
 4. **Focus intelligence:** focus environments, focus score explainability, challenges and advanced blocking controls.
 5. **AI coach:** opt-in insights, AI planner and weekly reports with privacy controls.
 6. **Platform polish:** widgets, Quick Settings, sync, backup, sleep/detox and accessibility QA.
+
+## Data integrity and no-demo-data policy
+
+- Never ship fake usage, notifications, sleep, focus, calendar, AI insight, leaderboard or productivity records as if they belong to the user.
+- No seeded/sample tasks or habits, demo dashboards, placeholder chart series, fabricated app usage, fake API responses or silent fallback to invented values.
+- Empty states must be explicit. If Android permission is missing, a provider is unavailable, or a metric cannot be measured, show a permission-required/unavailable/error state rather than a guessed number.
+- Static labels, validation limits, system category names and UI copy are configuration, not user data. They must not be used to fabricate activity.
+- Any future starter templates must be opt-in, clearly labelled as templates, and created only after an explicit user action.
+- AI output must be generated from the user's selected real data, cite the metric/time range used, and clearly identify when the model cannot provide an answer. Never return canned coaching as if it were personalized.
 
 ## Engineering rules
 
