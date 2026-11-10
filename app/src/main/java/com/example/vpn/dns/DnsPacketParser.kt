@@ -31,6 +31,8 @@ data class DnsQuery(
     }
 
 
+}
+
 object DnsPacketParser {
 
     const val QTYPE_A = 1
