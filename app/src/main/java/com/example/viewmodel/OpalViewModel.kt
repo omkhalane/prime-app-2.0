@@ -258,7 +258,8 @@ class OpalViewModel(
                     _uiState.value.pomodoroState.remainingSeconds.coerceAtLeast(1) * 1000L,
                     "Pomodoro session complete",
                     "Your ${_uiState.value.pomodoroState.sessionType.displayName.lowercase()} session is finished.",
-                    _uiState.value.clockPreferences.sessionSoundsEnabled
+                    _uiState.value.clockPreferences.sessionSoundsEnabled,
+                    ClockTimerReceiver.TIMER_POMODORO
                 )
             }
         }
@@ -742,7 +743,7 @@ class OpalViewModel(
     private fun startRecoveredTimerLoop() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
-            while (_uiState.value.isTimerRunning && _uiState.value.timerRemainingSeconds > 0) {
+            while (_uiState.value.isTimerRunning) {
                 delay(1000L)
                 if (!_uiState.value.isTimerPaused) {
                     val remaining = repository.getSavedStandardTimerState().first
