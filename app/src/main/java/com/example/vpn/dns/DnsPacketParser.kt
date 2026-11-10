@@ -29,56 +29,7 @@ data class DnsQuery(
         result = 31 * result + qtype
         return result
     }
-    /** Minimum answer-section TTL in seconds; null means malformed or no positive answer. */
-    fun minimumAnswerTtlSeconds(response: ByteArray): Long? {
-        if (response.size < 12) return null
-        fun u16(offset: Int): Int {
-            if (offset < 0 || offset + 2 > response.size) throw IndexOutOfBoundsException()
-            return ((response[offset].toInt() and 0xFF) shl 8) or (response[offset + 1].toInt() and 0xFF)
-        }
-        fun skipName(start: Int): Int? {
-            var pos = start
-            while (pos < response.size) {
-                val length = response[pos].toInt() and 0xFF
-                if (length == 0) return pos + 1
-                if ((length and 0xC0) == 0xC0) return if (pos + 1 < response.size) pos + 2 else null
-                if ((length and 0xC0) != 0 || pos + 1 + length > response.size) return null
-                pos += 1 + length
-            }
-            return null
-        }
-        return try {
-            val questions = u16(4)
-            val answers = u16(6)
-            val authorities = u16(8)
-            val additional = u16(10)
-            if (answers == 0) return null
-            var offset = 12
-            repeat(questions) {
-                offset = (skipName(offset) ?: return null) + 4
-                if (offset > response.size) return null
-            }
-            var minTtl: Long? = null
-            repeat(answers + authorities + additional) { index ->
-                val nameEnd = skipName(offset) ?: return null
-                val ttlOffset = nameEnd + 4
-                val lengthOffset = nameEnd + 8
-                if (lengthOffset + 2 > response.size || ttlOffset + 4 > response.size) return null
-                val ttl = ((response[ttlOffset].toLong() and 0xFF) shl 24) or
-                    ((response[ttlOffset + 1].toLong() and 0xFF) shl 16) or
-                    ((response[ttlOffset + 2].toLong() and 0xFF) shl 8) or
-                    (response[ttlOffset + 3].toLong() and 0xFF)
-                val recordLength = u16(lengthOffset)
-                val end = lengthOffset + 2 + recordLength
-                if (end > response.size) return null
-                if (index < answers) minTtl = minOf(minTtl ?: ttl, ttl)
-                offset = end
-            }
-            minTtl
-        } catch (_: Exception) { null }
-    }
 
-}
 
 object DnsPacketParser {
 
@@ -188,4 +139,53 @@ object DnsPacketParser {
             return null
         }
     }
+    /** Minimum answer-section TTL in seconds; null means malformed or no positive answer. */
+    fun minimumAnswerTtlSeconds(response: ByteArray): Long? {
+        if (response.size < 12) return null
+        fun u16(offset: Int): Int {
+            if (offset < 0 || offset + 2 > response.size) throw IndexOutOfBoundsException()
+            return ((response[offset].toInt() and 0xFF) shl 8) or (response[offset + 1].toInt() and 0xFF)
+        }
+        fun skipName(start: Int): Int? {
+            var pos = start
+            while (pos < response.size) {
+                val length = response[pos].toInt() and 0xFF
+                if (length == 0) return pos + 1
+                if ((length and 0xC0) == 0xC0) return if (pos + 1 < response.size) pos + 2 else null
+                if ((length and 0xC0) != 0 || pos + 1 + length > response.size) return null
+                pos += 1 + length
+            }
+            return null
+        }
+        return try {
+            val questions = u16(4)
+            val answers = u16(6)
+            val authorities = u16(8)
+            val additional = u16(10)
+            if (answers == 0) return null
+            var offset = 12
+            repeat(questions) {
+                offset = (skipName(offset) ?: return null) + 4
+                if (offset > response.size) return null
+            }
+            var minTtl: Long? = null
+            repeat(answers + authorities + additional) { index ->
+                val nameEnd = skipName(offset) ?: return null
+                val ttlOffset = nameEnd + 4
+                val lengthOffset = nameEnd + 8
+                if (lengthOffset + 2 > response.size || ttlOffset + 4 > response.size) return null
+                val ttl = ((response[ttlOffset].toLong() and 0xFF) shl 24) or
+                    ((response[ttlOffset + 1].toLong() and 0xFF) shl 16) or
+                    ((response[ttlOffset + 2].toLong() and 0xFF) shl 8) or
+                    (response[ttlOffset + 3].toLong() and 0xFF)
+                val recordLength = u16(lengthOffset)
+                val end = lengthOffset + 2 + recordLength
+                if (end > response.size) return null
+                if (index < answers) minTtl = minOf(minTtl ?: ttl, ttl)
+                offset = end
+            }
+            minTtl
+        } catch (_: Exception) { null }
+    }
+
 }
