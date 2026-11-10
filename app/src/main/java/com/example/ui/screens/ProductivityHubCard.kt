@@ -119,7 +119,8 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
                 Text("  TASKS  ·  ${tasks.count { it.done }}/${tasks.size} completed", color = Color(0xFFCAD5E8), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
             if (tasks.isEmpty()) Text("Add your first task for today.", color = Color(0xFF9BA8BD), fontSize = 13.sp)
-            tasks.forEachIndexed { index, task ->
+            (0 until tasks.size).toList().forEach { index ->
+                val task = tasks[index]
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = task.done, onCheckedChange = { checked ->
                         tasks[index] = task.copy(done = checked)
