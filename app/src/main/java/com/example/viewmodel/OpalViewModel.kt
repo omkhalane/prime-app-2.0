@@ -747,7 +747,10 @@ class OpalViewModel(
                 if (!_uiState.value.isTimerPaused) {
                     val remaining = repository.getSavedStandardTimerState().first
                     if (remaining <= 0) {
-                        repository.clearStandardTimerState(_uiState.value.timerSelectedMinutes)
+                        val completedMin = _uiState.value.timerSelectedMinutes
+                        repository.addFocusMinutes(completedMin)
+                        repository.logActivityAndBoostStreak()
+                        repository.clearStandardTimerState(completedMin)
                         context?.let { ClockTimerReceiver.cancel(it) }
                         repository.clearTimerSessionAppBlock()
                         blockingManager?.onFocusSessionEnded()
@@ -758,6 +761,12 @@ class OpalViewModel(
                             activePresetTitle = null,
                             activePreset = null,
                             snackbarMessage = "Focus session completed!"
+                        )
+                        val tracking = repository.refreshRealScreenTime()
+                        refreshAchievementProgress(
+                            if (tracking?.errorMessage == null && tracking != null) {
+                                (tracking.totalScreenTimeMillis / 60_000L).toInt()
+                            } else null
                         )
                     } else {
                         _uiState.value = _uiState.value.copy(timerRemainingSeconds = remaining)
@@ -853,7 +862,7 @@ class OpalViewModel(
         )
         _uiState.value = _uiState.value.copy(pomodoroState = runningState)
         repository.savePomodoroState(runningState)
-        context?.let { ClockTimerReceiver.schedule(it, targetSeconds * 1000L, "Pomodoro session complete", "Your ${current.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
+        context?.let { ClockTimerReceiver.schedule(it, targetSeconds * 1000L, "Pomodoro session complete", "Your ${current.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled, ClockTimerReceiver.TIMER_POMODORO) }
 
         launchPomodoroLoop()
     }
@@ -862,20 +871,20 @@ class OpalViewModel(
         val updated = _uiState.value.pomodoroState.copy(isPaused = true)
         _uiState.value = _uiState.value.copy(pomodoroState = updated)
         repository.savePomodoroState(updated)
-        context?.let { ClockTimerReceiver.cancel(it) }
+        context?.let { ClockTimerReceiver.cancel(it, ClockTimerReceiver.TIMER_POMODORO) }
     }
 
     fun resumePomodoro() {
         val updated = _uiState.value.pomodoroState.copy(isPaused = false)
         _uiState.value = _uiState.value.copy(pomodoroState = updated)
         repository.savePomodoroState(updated)
-        context?.let { ClockTimerReceiver.schedule(it, updated.remainingSeconds * 1000L, "Pomodoro session complete", "Your ${updated.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled) }
+        context?.let { ClockTimerReceiver.schedule(it, updated.remainingSeconds * 1000L, "Pomodoro session complete", "Your ${updated.sessionType.displayName.lowercase()} session is finished.", _uiState.value.clockPreferences.sessionSoundsEnabled, ClockTimerReceiver.TIMER_POMODORO) }
         launchPomodoroLoop()
     }
 
     fun resetPomodoro() {
         pomodoroJob?.cancel()
-        context?.let { ClockTimerReceiver.cancel(it) }
+        context?.let { ClockTimerReceiver.cancel(it, ClockTimerReceiver.TIMER_POMODORO) }
         val settings = _uiState.value.pomodoroSettings
         val resetState = PomodoroState(
             sessionType = PomodoroSessionType.FOCUS,
@@ -1020,10 +1029,11 @@ class OpalViewModel(
                     nextPomodoro.remainingSeconds.coerceAtLeast(1) * 1000L,
                     "Pomodoro session complete",
                     "Your ${nextPomodoro.sessionType.displayName.lowercase()} session is finished.",
-                    _uiState.value.clockPreferences.sessionSoundsEnabled
+                    _uiState.value.clockPreferences.sessionSoundsEnabled,
+                    ClockTimerReceiver.TIMER_POMODORO
                 )
             } else {
-                ClockTimerReceiver.cancel(ctx)
+                ClockTimerReceiver.cancel(ctx, ClockTimerReceiver.TIMER_POMODORO)
             }
         }
     }
