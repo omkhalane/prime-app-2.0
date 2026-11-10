@@ -1,0 +1,86 @@
+# Prime Productivity Ecosystem — Implementation Roadmap
+
+Prime is being expanded from a digital-wellbeing and clock app into a privacy-first productivity ecosystem. This roadmap records the complete requested scope and distinguishes shipped work from planned work; a roadmap item is not considered implemented until its UI, persistence, permission flow, tests and device behaviour are complete.
+
+## Current baseline
+
+- Digital wellbeing dashboard and screen-time tracking.
+- App and website blocking, schedules, blocking analytics and recovery.
+- Alarm, countdown timer, Pomodoro and stopwatch experiences.
+- Alarm themes, ringtone selection/import, completion alerts and reboot restoration (PR #4 merged into main).
+- Prime score, achievements, streak and weekly-report foundations.
+- **New in this branch:** Room-backed offline planner schema for tasks, projects, habits and date-keyed habit check-ins; live planner UI; task priorities, optional due dates, recurring task generation on completion (daily, weekdays, weekly, monthly), habit weekday schedules, check-in validation, archive/delete actions and input validation. No seeded user records are created. The older SharedPreferences planner data remains on-device but is not yet migrated into Room; migration is required before removing the legacy store.
+
+## Product modules and complete feature scope
+
+### 1. Digital Wellbeing
+- Validate foreground usage against Android UsageStatsManager and installed-package metadata.
+- Daily/weekly/monthly app usage, hourly heatmap, unlock/session counts where the platform exposes reliable signals.
+- Notification counts and categories through an explicitly enabled NotificationListenerService; never collect notification content by default.
+- Per-app goals, usage warnings, category budgets, usage trends and export.
+- Explain data freshness, permission state, unavailable metrics and Android/OEM limitations in the UI.
+
+### 2. Focus and app blocking
+- Focus sessions linked to tasks and projects.
+- App blocking profiles, schedules, strict mode, break allowances and emergency cooldown.
+- Keep enforcement transparent and use supported Android APIs; never promise an unbypassable blocker on ordinary consumer devices.
+- Focus environments: locally bundled ambient sound loops, mix controls, sleep timer, offline playback and audio focus handling.
+- XP, achievements, streaks and opt-in personal challenges.
+
+### 3. Tasks, habits and planning
+- Implemented in this branch: Room entities/DAO/repository for tasks, projects, habits and dated check-ins; task priorities, optional due dates, daily/weekday/weekly/monthly recurrence generation when a task is completed; habit weekday masks and date-scoped check-ins; task/habit create, completion and delete/archive UI; blank/length/date/duplicate/schedule validation.
+- Remaining: safe one-time import of legacy SharedPreferences tasks, project management UI and task assignment, task editing/subtasks, Android Calendar provider integration, reminders/notifications, task-to-Pomodoro attribution, historical streak calculations and habit heatmaps.
+- AI-assisted daily planning remains blocked on explicit provider configuration, opt-in consent, data preview and privacy controls.
+
+### 4. AI productivity coach
+- Opt-in daily and weekly insights based on locally aggregated metrics.
+- Explain recommendations with the source metrics and time range.
+- AI task prioritisation and schedule suggestions; user approves all changes.
+- Privacy controls: preview what is sent, redact app names, disable cloud analysis, delete AI history.
+- Keep essential wellbeing, timer, task and alarm functions usable offline. Do not make unsupported medical or diagnostic claims.
+
+### 5. Clock and focus tools
+- Continue device testing and hardening of alarms, timer, stopwatch and Pomodoro.
+- Multiple alarm profiles, smart snooze controls, gradual volume, challenge dismissal, local audio library and wallpaper selection.
+- Spotify can provide supported playlist discovery/deep links; protected Spotify tracks must not be represented as locally playable alarm tones.
+- Ambient audio and sound packs must support offline use and correct audio-focus/foreground-service behaviour.
+
+### 6. Sleep and detox
+- Bedtime schedule, wind-down reminders, sleep consistency tracking based on user-entered or supported device data.
+- Digital detox schedules, focus profiles and mindful break reminders.
+- Do not claim clinical sleep tracking without a supported sensor/data source.
+
+### 7. Platform and premium quality
+- Home-screen widgets and Android Quick Settings tile.
+- Theme editor, accessible typography, contrast and reduced-motion option.
+- Backup/restore and optional cloud sync with encryption and conflict handling.
+- Monthly reports, data export/deletion and clear privacy settings.
+- Battery, accessibility, TalkBack, large-font and small-screen QA.
+
+## Delivery phases
+
+1. **Foundation (active):** task/habit local persistence, model and repository design, test coverage, UX entry points.
+2. **Planner:** recurring tasks, priorities, reminders, calendar, task-to-focus linking and habit history.
+3. **Wellbeing accuracy:** reconcile all usage metrics, data freshness, permission education, notification analytics and goals.
+4. **Focus intelligence:** focus environments, focus score explainability, challenges and advanced blocking controls.
+5. **AI coach:** opt-in insights, AI planner and weekly reports with privacy controls.
+6. **Platform polish:** widgets, Quick Settings, sync, backup, sleep/detox and accessibility QA.
+
+## Data integrity and no-demo-data policy
+
+- Never ship fake usage, notifications, sleep, focus, calendar, AI insight, leaderboard or productivity records as if they belong to the user.
+- No seeded/sample tasks or habits, demo dashboards, placeholder chart series, fabricated app usage, fake API responses or silent fallback to invented values.
+- Empty states must be explicit. If Android permission is missing, a provider is unavailable, or a metric cannot be measured, show a permission-required/unavailable/error state rather than a guessed number.
+- Static labels, validation limits, system category names and UI copy are configuration, not user data. They must not be used to fabricate activity.
+- The productivity Room database is a separate database file. Existing legacy SharedPreferences planner data is not deleted, but a one-time import/migration is still required before switching off that legacy storage.
+- Any future starter templates must be opt-in, clearly labelled as templates, and created only after an explicit user action.
+- AI output must be generated from the user's selected real data, cite the metric/time range used, and clearly identify when the model cannot provide an answer. Never return canned coaching as if it were personalized.
+
+## Engineering rules
+
+- Prefer Room for structured tasks, habits, recurring schedules and history; DataStore for settings. Migrate SharedPreferences data safely rather than dropping existing user data.
+- Use WorkManager for deferrable reminders/sync; AlarmManager only for user-visible exact alarm use cases and handle denied exact-alarm access.
+- Use Android runtime/special access permissions only when the feature is enabled and explain why before requesting them.
+- Add unit tests for date boundaries, recurring schedules, streak calculation, score calculations and state restoration.
+- Test background execution, process death, reboot, time-zone changes, daylight-saving changes, battery saver and OEM restrictions on physical devices.
+- Do not claim a feature is complete based on a screen mockup alone. Each feature needs real behaviour, persistence, error states, tests and documented platform limitations.
