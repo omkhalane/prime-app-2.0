@@ -53,9 +53,9 @@ class BlockingManager private constructor(private val context: Context) {
     val activeRulesCount: StateFlow<Int> = _activeRulesCount.asStateFlow()
 
     // Focus Session active state
-    private var isSessionActive = false
-    private var sessionBlockedDomains = mutableSetOf<String>()
-    private var sessionBlockedCategories = mutableSetOf<String>()
+    @Volatile private var isSessionActive = prefs.getBoolean("focus_session_active", false)
+    private val sessionBlockedDomains = (prefs.getStringSet("focus_session_domains", emptySet()) ?: emptySet()).toMutableSet()
+    private val sessionBlockedCategories = (prefs.getStringSet("focus_session_categories", emptySet()) ?: emptySet()).toMutableSet()
 
     init {
         scope.launch {
@@ -190,6 +190,9 @@ class BlockingManager private constructor(private val context: Context) {
         sessionBlockedDomains.addAll(blockedDomains)
         sessionBlockedCategories.clear()
         sessionBlockedCategories.addAll(blockedCategories)
+        prefs.edit().putBoolean("focus_session_active", true)
+            .putStringSet("focus_session_domains", sessionBlockedDomains.toSet())
+            .putStringSet("focus_session_categories", sessionBlockedCategories.toSet()).apply()
         scope.launch {
             reconcileActiveRules()
         }
@@ -199,6 +202,8 @@ class BlockingManager private constructor(private val context: Context) {
         isSessionActive = false
         sessionBlockedDomains.clear()
         sessionBlockedCategories.clear()
+        prefs.edit().putBoolean("focus_session_active", false)
+            .remove("focus_session_domains").remove("focus_session_categories").apply()
         scope.launch {
             reconcileActiveRules()
         }
@@ -213,6 +218,8 @@ class BlockingManager private constructor(private val context: Context) {
         isSessionActive = false
         sessionBlockedDomains.clear()
         sessionBlockedCategories.clear()
+        prefs.edit().putBoolean("focus_session_active", false)
+            .remove("focus_session_domains").remove("focus_session_categories").apply()
         PrimeVpnService.stopService(context)
         _isVpnRunning.value = false
         checkpointBlockingDuration()

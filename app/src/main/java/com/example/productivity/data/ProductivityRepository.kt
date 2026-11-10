@@ -46,11 +46,13 @@ class ProductivityRepository(private val dao: ProductivityDao) {
         val existing = dao.task(id) ?: return ProductivityResult.NotFound
         val now = System.currentTimeMillis()
         if (existing.completedAt != null && done) return ProductivityResult.Success(id)
-        if (dao.setTaskCompleted(id, if (done) now else null, now) == 0) return ProductivityResult.NotFound
         if (done && existing.recurrence != TaskRecurrence.NONE.name) {
             val nextDue = nextOccurrence(existing.dueAt ?: now, TaskRecurrence.valueOf(existing.recurrence))
             val nextId = UUID.randomUUID().toString()
-            dao.insertTask(existing.copy(id = nextId, dueAt = nextDue, completedAt = null, createdAt = now, updatedAt = now))
+            val nextTask = existing.copy(id = nextId, dueAt = nextDue, completedAt = null, createdAt = now, updatedAt = now)
+            if (!dao.completeTaskAndInsertNext(id, now, nextTask)) return ProductivityResult.NotFound
+        } else if (dao.setTaskCompleted(id, if (done) now else null, now) == 0) {
+            return ProductivityResult.NotFound
         }
         return ProductivityResult.Success(id)
     }

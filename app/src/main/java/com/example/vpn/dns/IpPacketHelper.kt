@@ -124,6 +124,79 @@ object IpPacketHelper {
         return packet
     }
 
+
+    /** Parses a basic IPv6 UDP packet. Extension-header chains are deliberately rejected. */
+    fun parseIpv6Udp(packet: ByteArray, length: Int): ParsedUdpPacket? {
+        if (length < 48 || ((packet[0].toInt() ushr 4) and 0x0F) != 6) return null
+        val buffer = ByteBuffer.wrap(packet, 0, length)
+        val payloadLength = buffer.getShort(4).toInt() and 0xFFFF
+        if ((buffer.get(6).toInt() and 0xFF) != PROTOCOL_UDP.toInt()) return null
+        if (payloadLength < 8 || payloadLength > length - 40) return null
+        val sourceIp = ByteArray(16)
+        val destIp = ByteArray(16)
+        buffer.position(8)
+        buffer.get(sourceIp)
+        buffer.get(destIp)
+        buffer.position(40)
+        val sourcePort = buffer.short.toInt() and 0xFFFF
+        val destPort = buffer.short.toInt() and 0xFFFF
+        val udpLength = buffer.short.toInt() and 0xFFFF
+        buffer.short
+        if (udpLength < 8 || udpLength > payloadLength || buffer.remaining() < udpLength - 8) return null
+        val payload = ByteArray(udpLength - 8)
+        buffer.get(payload)
+        return ParsedUdpPacket(sourceIp, destIp, sourcePort, destPort, payload)
+    }
+
+    /** Builds an IPv6 UDP response with the mandatory IPv6 UDP pseudo-header checksum. */
+    fun buildIpv6UdpPacket(sourceIp: ByteArray, destIp: ByteArray, sourcePort: Int,
+                           destPort: Int, udpPayload: ByteArray): ByteArray {
+        require(sourceIp.size == 16 && destIp.size == 16) { "IPv6 addresses must be 16 bytes" }
+        val udpLength = 8 + udpPayload.size
+        require(udpLength <= 0xFFFF) { "UDP payload is too large" }
+        val packet = ByteArray(40 + udpLength)
+        val buffer = ByteBuffer.wrap(packet)
+        buffer.put(0x60.toByte())
+        buffer.put(0); buffer.put(0); buffer.put(0)
+        buffer.putShort(udpLength.toShort())
+        buffer.put(PROTOCOL_UDP)
+        buffer.put(64.toByte())
+        buffer.put(sourceIp)
+        buffer.put(destIp)
+        buffer.putShort(sourcePort.toShort())
+        buffer.putShort(destPort.toShort())
+        buffer.putShort(udpLength.toShort())
+        buffer.putShort(0)
+        buffer.put(udpPayload)
+
+        val pseudo = ByteArray(40 + udpLength)
+        System.arraycopy(sourceIp, 0, pseudo, 0, 16)
+        System.arraycopy(destIp, 0, pseudo, 16, 16)
+        pseudo[32] = ((udpLength ushr 24) and 0xFF).toByte()
+        pseudo[33] = ((udpLength ushr 16) and 0xFF).toByte()
+        pseudo[34] = ((udpLength ushr 8) and 0xFF).toByte()
+        pseudo[35] = (udpLength and 0xFF).toByte()
+        pseudo[39] = PROTOCOL_UDP
+        System.arraycopy(packet, 40, pseudo, 40, udpLength)
+        var checksum = computeChecksum(pseudo)
+        if (checksum == 0) checksum = 0xFFFF
+        ByteBuffer.wrap(packet).putShort(46, checksum.toShort())
+        return packet
+    }
+
+    private fun computeChecksum(data: ByteArray): Int {
+        var sum = 0L
+        var i = 0
+        while (i < data.size) {
+            val high = data[i].toInt() and 0xFF
+            val low = if (i + 1 < data.size) data[i + 1].toInt() and 0xFF else 0
+            sum += ((high shl 8) or low).toLong()
+            i += 2
+        }
+        while ((sum ushr 16) != 0L) sum = (sum and 0xFFFFL) + (sum ushr 16)
+        return sum.inv().toInt() and 0xFFFF
+    }
+
     private fun computeIpChecksum(data: ByteArray, offset: Int, length: Int): Int {
         var sum = 0
         var i = offset

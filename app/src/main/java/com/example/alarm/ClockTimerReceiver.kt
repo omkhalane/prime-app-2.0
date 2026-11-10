@@ -20,22 +20,37 @@ class ClockTimerReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        private const val ACTION_FIRE = "com.example.action.CLOCK_TIMER_FIRE"
-        private const val REQUEST_CODE = 4206
+        const val TIMER_STANDARD = "standard"
+        const val TIMER_POMODORO = "pomodoro"
+        private const val ACTION_FIRE_STANDARD = "com.example.action.CLOCK_TIMER_FIRE_STANDARD"
+        private const val ACTION_FIRE_POMODORO = "com.example.action.CLOCK_TIMER_FIRE_POMODORO"
+        private const val REQUEST_CODE_STANDARD = 4206
+        private const val REQUEST_CODE_POMODORO = 4207
 
-        fun schedule(context: Context, delayMillis: Long, title: String, message: String, soundEnabled: Boolean = true) {
-            cancel(context)
+        private fun requestCode(timerType: String): Int = when (timerType) {
+            TIMER_STANDARD -> REQUEST_CODE_STANDARD
+            TIMER_POMODORO -> REQUEST_CODE_POMODORO
+            else -> throw IllegalArgumentException("Unsupported timer type: $timerType")
+        }
+
+        private fun action(timerType: String): String = when (timerType) {
+            TIMER_STANDARD -> ACTION_FIRE_STANDARD
+            TIMER_POMODORO -> ACTION_FIRE_POMODORO
+            else -> throw IllegalArgumentException("Unsupported timer type: $timerType")
+        }
+
+        fun schedule(context: Context, delayMillis: Long, title: String, message: String,
+                     soundEnabled: Boolean = true, timerType: String = TIMER_STANDARD) {
+            cancel(context, timerType)
             if (delayMillis <= 0L) return
             val intent = Intent(context, ClockTimerReceiver::class.java).apply {
-                action = ACTION_FIRE
+                action = action(timerType)
                 putExtra(ClockTimerAlertService.EXTRA_TITLE, title)
                 putExtra(ClockTimerAlertService.EXTRA_MESSAGE, message)
                 putExtra(ClockTimerAlertService.EXTRA_SOUND_ENABLED, soundEnabled)
             }
-            val pending = PendingIntent.getBroadcast(
-                context, REQUEST_CODE, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val pending = PendingIntent.getBroadcast(context, requestCode(timerType), intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
             val triggerAt = System.currentTimeMillis() + delayMillis
             try {
@@ -45,6 +60,7 @@ class ClockTimerReceiver : BroadcastReceiver() {
                     alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pending)
                 }
             } catch (_: SecurityException) {
+                // Best-effort fallback; the app must still deliver a completion notification.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
                 } else {
@@ -53,12 +69,10 @@ class ClockTimerReceiver : BroadcastReceiver() {
             }
         }
 
-        fun cancel(context: Context) {
-            val intent = Intent(context, ClockTimerReceiver::class.java).setAction(ACTION_FIRE)
-            val pending = PendingIntent.getBroadcast(
-                context, REQUEST_CODE, intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-            ) ?: return
+        fun cancel(context: Context, timerType: String = TIMER_STANDARD) {
+            val intent = Intent(context, ClockTimerReceiver::class.java).setAction(action(timerType))
+            val pending = PendingIntent.getBroadcast(context, requestCode(timerType), intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE) ?: return
             (context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager)?.cancel(pending)
             pending.cancel()
         }
