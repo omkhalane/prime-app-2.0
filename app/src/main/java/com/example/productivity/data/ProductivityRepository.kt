@@ -30,6 +30,7 @@ class ProductivityRepository(private val dao: ProductivityDao) {
         if (title.length !in 2..80) return ProductivityResult.Invalid("Task title must contain 2–80 characters.")
         if (notes.length > 2000) return ProductivityResult.Invalid("Notes cannot exceed 2,000 characters.")
         if (dueAt != null && dueAt < 0L) return ProductivityResult.Invalid("Due date is invalid.")
+        if (recurrence != TaskRecurrence.NONE && dueAt == null) return ProductivityResult.Invalid("A due date is required for recurring tasks.")
         if (dao.countTasksWithTitle(title) > 0) return ProductivityResult.Duplicate
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
@@ -42,9 +43,33 @@ class ProductivityRepository(private val dao: ProductivityDao) {
     }
 
     suspend fun setTaskDone(id: String, done: Boolean): ProductivityResult {
-        if (dao.task(id) == null) return ProductivityResult.NotFound
+        val existing = dao.task(id) ?: return ProductivityResult.NotFound
         val now = System.currentTimeMillis()
-        return if (dao.setTaskCompleted(id, if (done) now else null, now) > 0) ProductivityResult.Success(id) else ProductivityResult.NotFound
+        if (existing.completedAt != null && done) return ProductivityResult.Success(id)
+        if (dao.setTaskCompleted(id, if (done) now else null, now) == 0) return ProductivityResult.NotFound
+        if (done && existing.recurrence != TaskRecurrence.NONE.name) {
+            val nextDue = nextOccurrence(existing.dueAt ?: now, TaskRecurrence.valueOf(existing.recurrence))
+            val nextId = UUID.randomUUID().toString()
+            dao.insertTask(existing.copy(id = nextId, dueAt = nextDue, completedAt = null, createdAt = now, updatedAt = now))
+        }
+        return ProductivityResult.Success(id)
+    }
+
+    private fun nextOccurrence(from: Long, recurrence: TaskRecurrence): Long {
+        val calendar = java.util.Calendar.getInstance().apply { timeInMillis = from }
+        when (recurrence) {
+            TaskRecurrence.NONE -> Unit
+            TaskRecurrence.DAILY -> calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+            TaskRecurrence.WEEKDAYS -> {
+                calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                while (calendar.get(java.util.Calendar.DAY_OF_WEEK) in listOf(java.util.Calendar.SATURDAY, java.util.Calendar.SUNDAY)) {
+                    calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+                }
+            }
+            TaskRecurrence.WEEKLY -> calendar.add(java.util.Calendar.WEEK_OF_YEAR, 1)
+            TaskRecurrence.MONTHLY -> calendar.add(java.util.Calendar.MONTH, 1)
+        }
+        return calendar.timeInMillis
     }
 
     suspend fun deleteTask(id: String): ProductivityResult =
