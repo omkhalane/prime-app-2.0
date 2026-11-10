@@ -99,7 +99,7 @@
 
         <!-- PRIME Local DNS VPN Blocking Service -->
         <service
-            android:name=".vpn.PrimeVpnService"
+            android:name=".vpn.service.PrimeVpnService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:foregroundServiceType="specialUse|systemExempted"
             android:exported="false">
