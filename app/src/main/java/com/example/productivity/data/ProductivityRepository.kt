@@ -1,7 +1,6 @@
 package com.example.productivity.data
 
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -31,6 +30,7 @@ class ProductivityRepository(private val dao: ProductivityDao) {
         if (title.length !in 2..80) return ProductivityResult.Invalid("Task title must contain 2–80 characters.")
         if (notes.length > 2000) return ProductivityResult.Invalid("Notes cannot exceed 2,000 characters.")
         if (dueAt != null && dueAt < 0L) return ProductivityResult.Invalid("Due date is invalid.")
+        if (dao.countTasksWithTitle(title) > 0) return ProductivityResult.Duplicate
         val now = System.currentTimeMillis()
         val id = UUID.randomUUID().toString()
         return try {
@@ -54,6 +54,7 @@ class ProductivityRepository(private val dao: ProductivityDao) {
         val title = titleInput.trim()
         if (title.length !in 2..60) return ProductivityResult.Invalid("Habit name must contain 2–60 characters.")
         if (activeDays.isEmpty() || activeDays.any { it !in 0..6 }) return ProductivityResult.Invalid("Select at least one valid weekday.")
+        if (dao.countHabitsWithTitle(title) > 0) return ProductivityResult.Duplicate
         val now = System.currentTimeMillis()
         val mask = activeDays.fold(0) { acc, day -> acc or (1 shl day) }
         val id = UUID.randomUUID().toString()
