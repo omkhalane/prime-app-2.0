@@ -119,22 +119,13 @@ class PrimeVpnService : VpnService() {
                 // Route all DNS traffic destined to virtual server through this TUN interface
                 addRoute("10.254.1.2", 32)
 
-                // Route common public DNS addresses to catch hardcoded browser DNS resolvers
-                addRoute("1.1.1.1", 32)
-                addRoute("1.0.0.1", 32)
-                addRoute("8.8.8.8", 32)
-                addRoute("8.8.4.4", 32)
-                addRoute("9.9.9.9", 32)
-
-                // IPv6 DNS to prevent DNS leaks on IPv6-enabled networks
+                // Route only synthetic DNS endpoints. Routing public resolver IPs would
+                // also capture TCP/DoT and unrelated traffic that this DNS-only engine
+                // cannot proxy, silently breaking those connections.
                 try {
                     addAddress("fd00:1:fd00:1::1", 128)
                     addDnsServer("fd00:1:fd00:1::2")
                     addRoute("fd00:1:fd00:1::2", 128)
-                    addRoute("2001:4860:4860::8888", 128)
-                    addRoute("2001:4860:4860::8844", 128)
-                    addRoute("2606:4700:4700::1111", 128)
-                    addRoute("2606:4700:4700::1001", 128)
                 } catch (_: Exception) {}
 
                 try {
@@ -180,30 +171,55 @@ class PrimeVpnService : VpnService() {
                     val length = inStream.read(packetBuffer)
                     if (length <= 0) continue
 
-                    val udpPacket = IpPacketHelper.parseIpv4Udp(packetBuffer, length)
+                    val ipVersion = (packetBuffer[0].toInt() ushr 4) and 0x0F
+                    val udpPacket = when (ipVersion) {
+                        4 -> IpPacketHelper.parseIpv4Udp(packetBuffer, length)
+                        6 -> IpPacketHelper.parseIpv6Udp(packetBuffer, length)
+                        else -> null
+                    }
                     if (udpPacket != null && udpPacket.destPort == 53) {
                         // DNS query arrived on port 53
                         val filterResult = dnsFilterEngine.processDnsPayload(udpPacket.payload)
 
                         when (filterResult) {
                             is DnsFilterResult.Blocked -> {
-                                val responsePacket = IpPacketHelper.buildIpv4UdpPacket(
-                                    sourceIp = udpPacket.destIp,
-                                    destIp = udpPacket.sourceIp,
-                                    sourcePort = udpPacket.destPort,
-                                    destPort = udpPacket.sourcePort,
-                                    udpPayload = filterResult.responsePayload
-                                )
+                                val responsePacket = if (udpPacket.sourceIp.size == 16) {
+                                    IpPacketHelper.buildIpv6UdpPacket(
+                                        sourceIp = udpPacket.destIp,
+                                        destIp = udpPacket.sourceIp,
+                                        sourcePort = udpPacket.destPort,
+                                        destPort = udpPacket.sourcePort,
+                                        udpPayload = filterResult.responsePayload
+                                    )
+                                } else {
+                                    IpPacketHelper.buildIpv4UdpPacket(
+                                        sourceIp = udpPacket.destIp,
+                                        destIp = udpPacket.sourceIp,
+                                        sourcePort = udpPacket.destPort,
+                                        destPort = udpPacket.sourcePort,
+                                        udpPayload = filterResult.responsePayload
+                                    )
+                                }
                                 outStream.write(responsePacket)
                             }
                             is DnsFilterResult.Allowed -> {
-                                val responsePacket = IpPacketHelper.buildIpv4UdpPacket(
-                                    sourceIp = udpPacket.destIp,
-                                    destIp = udpPacket.sourceIp,
-                                    sourcePort = udpPacket.destPort,
-                                    destPort = udpPacket.sourcePort,
-                                    udpPayload = filterResult.responsePayload
-                                )
+                                val responsePacket = if (udpPacket.sourceIp.size == 16) {
+                                    IpPacketHelper.buildIpv6UdpPacket(
+                                        sourceIp = udpPacket.destIp,
+                                        destIp = udpPacket.sourceIp,
+                                        sourcePort = udpPacket.destPort,
+                                        destPort = udpPacket.sourcePort,
+                                        udpPayload = filterResult.responsePayload
+                                    )
+                                } else {
+                                    IpPacketHelper.buildIpv4UdpPacket(
+                                        sourceIp = udpPacket.destIp,
+                                        destIp = udpPacket.sourceIp,
+                                        sourcePort = udpPacket.destPort,
+                                        destPort = udpPacket.sourcePort,
+                                        udpPayload = filterResult.responsePayload
+                                    )
+                                }
                                 outStream.write(responsePacket)
                             }
                             is DnsFilterResult.Ignored -> {
