@@ -9,7 +9,7 @@ Prime is being expanded from a digital-wellbeing and clock app into a privacy-fi
 - Alarm, countdown timer, Pomodoro and stopwatch experiences.
 - Alarm themes, ringtone selection/import, completion alerts and reboot restoration (PR #4 merged into main).
 - Prime score, achievements, streak and weekly-report foundations.
-- **New in this branch:** offline-first Daily Planner with user-created tasks and habits, completion toggles, deletion, duplicate/blank/length/count validation, local persistence and per-calendar-day habit check-ins. Fresh installs start with empty task and habit lists; no sample records are injected.
+- **New in this branch:** Room-backed offline planner schema for tasks, projects, habits and date-keyed habit check-ins; live planner UI; task priorities, optional due dates, recurring task generation on completion (daily, weekdays, weekly, monthly), habit weekday schedules, check-in validation, archive/delete actions and input validation. No seeded user records are created. The older SharedPreferences planner data remains on-device but is not yet migrated into Room; migration is required before removing the legacy store.
 
 ## Product modules and complete feature scope
 
@@ -28,11 +28,9 @@ Prime is being expanded from a digital-wellbeing and clock app into a privacy-fi
 - XP, achievements, streaks and opt-in personal challenges.
 
 ### 3. Tasks, habits and planning
-- Current first slice: local task list and daily habit check-ins.
-- Next: task priorities, due dates, recurring tasks, projects, subtasks, calendar view, reminders and completion history.
-- Link tasks to Pomodoro sessions and calculate focus time per task.
-- Habit creation, schedules, streaks, calendar heatmaps and progress charts.
-- AI-assisted daily planning only after the deterministic planner and data model are stable.
+- Implemented in this branch: Room entities/DAO/repository for tasks, projects, habits and dated check-ins; task priorities, optional due dates, daily/weekday/weekly/monthly recurrence generation when a task is completed; habit weekday masks and date-scoped check-ins; task/habit create, completion and delete/archive UI; blank/length/date/duplicate/schedule validation.
+- Remaining: safe one-time import of legacy SharedPreferences tasks, project management UI and task assignment, task editing/subtasks, Android Calendar provider integration, reminders/notifications, task-to-Pomodoro attribution, historical streak calculations and habit heatmaps.
+- AI-assisted daily planning remains blocked on explicit provider configuration, opt-in consent, data preview and privacy controls.
 
 ### 4. AI productivity coach
 - Opt-in daily and weekly insights based on locally aggregated metrics.
@@ -74,6 +72,7 @@ Prime is being expanded from a digital-wellbeing and clock app into a privacy-fi
 - No seeded/sample tasks or habits, demo dashboards, placeholder chart series, fabricated app usage, fake API responses or silent fallback to invented values.
 - Empty states must be explicit. If Android permission is missing, a provider is unavailable, or a metric cannot be measured, show a permission-required/unavailable/error state rather than a guessed number.
 - Static labels, validation limits, system category names and UI copy are configuration, not user data. They must not be used to fabricate activity.
+- The productivity Room database is a separate database file. Existing legacy SharedPreferences planner data is not deleted, but a one-time import/migration is still required before switching off that legacy storage.
 - Any future starter templates must be opt-in, clearly labelled as templates, and created only after an explicit user action.
 - AI output must be generated from the user's selected real data, cite the metric/time range used, and clearly identify when the model cannot provide an answer. Never return canned coaching as if it were personalized.
 
