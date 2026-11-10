@@ -34,7 +34,8 @@ class BootReceiver : BroadcastReceiver() {
                     pomodoro.remainingSeconds.coerceAtLeast(1) * 1000L,
                     "Pomodoro session complete",
                     "Your ${pomodoro.sessionType.displayName.lowercase()} session is finished.",
-                    repository.clockPreferencesFlow.value.sessionSoundsEnabled
+                    repository.clockPreferencesFlow.value.sessionSoundsEnabled,
+                    ClockTimerReceiver.TIMER_POMODORO
                 )
             }
             com.example.vpn.service.BlockingRecoveryManager.reconcileOnBoot(context)
