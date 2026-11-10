@@ -349,23 +349,22 @@ object RealScreenTimeTracker {
     }
 
     fun isAlwaysAllowedApp(name: String, pkg: String): Boolean {
-        val lower = (name + " " + pkg).lowercase()
-        return lower.contains("phone") ||
-                lower.contains("dialer") ||
-                lower.contains("telecom") ||
-                lower.contains("contacts") ||
-                lower.contains("messaging") ||
-                lower.contains("messages") ||
-                lower.contains("mms") ||
-                lower.contains("camera") ||
-                lower.contains("clock") ||
-                lower.contains("deskclock") ||
-                lower.contains("alarm") ||
-                lower.contains("calculator") ||
-                lower.contains("settings") ||
-                lower.contains("emergency") ||
-                lower.contains("maps") ||
-                lower.contains("authenticator")
+        val packageName = pkg.trim().lowercase()
+        val label = name.trim().lowercase()
+        val essentialPackages = setOf(
+            "com.android.phone", "com.android.server.telecom",
+            "com.google.android.dialer", "com.android.dialer", "com.samsung.android.dialer",
+            "com.android.contacts", "com.google.android.contacts", "com.samsung.android.app.contacts",
+            "com.android.messaging", "com.google.android.apps.messaging", "com.samsung.android.messaging",
+            "com.android.camera", "com.android.camera2", "com.google.android.deskclock",
+            "com.android.deskclock", "com.sec.android.app.clockpackage",
+            "com.android.calculator2", "com.google.android.calculator", "com.android.settings",
+            "com.google.android.apps.maps", "com.google.android.apps.authenticator2"
+        )
+        if (packageName in essentialPackages) return true
+        // Match complete labels: substring checks classified PhonePe as a system phone app.
+        return label in setOf("phone", "dialer", "contacts", "messages", "messaging",
+            "camera", "clock", "alarm", "calculator", "settings", "emergency", "maps", "authenticator")
     }
 
     fun isDistractingApp(name: String, pkg: String): Boolean {
