@@ -45,6 +45,9 @@ interface ProductivityDao {
     @Query("SELECT COUNT(*) FROM productivity_habits WHERE title = :title COLLATE NOCASE AND archived=0")
     suspend fun countHabitsWithTitle(title: String): Int
 
+    @Query("SELECT * FROM productivity_habits WHERE id=:id AND archived=0 LIMIT 1")
+    suspend fun habit(id: String): ProductivityHabitEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertHabit(habit: ProductivityHabitEntity)
 
