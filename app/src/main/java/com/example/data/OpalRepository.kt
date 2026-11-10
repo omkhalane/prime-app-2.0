@@ -35,7 +35,7 @@ class OpalRepository(private val context: Context? = null) {
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
     // Temporary timer-session targets must survive normal dashboard refreshes.
-    private var timerSessionBlockedPackages: Set<String> = emptySet()
+    private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
 
     // Initial default rules (can be edited/saved by user)
     private val defaultRules = listOf(
@@ -688,12 +688,14 @@ class OpalRepository(private val context: Context? = null) {
     }
 
     fun applyTimerSessionAppBlock(sessionPackageNames: Set<String>) {
-        timerSessionBlockedPackages = sessionPackageNames
+        timerSessionBlockedPackages = sessionPackageNames.filter { it.isNotBlank() }.toSet()
+        prefs?.edit()?.putStringSet("timer_session_blocked_packages", timerSessionBlockedPackages)?.apply()
         syncAccessibilityBlockList()
     }
 
     fun clearTimerSessionAppBlock() {
         timerSessionBlockedPackages = emptySet()
+        prefs?.edit()?.remove("timer_session_blocked_packages")?.apply()
         syncAccessibilityBlockList()
     }
 
