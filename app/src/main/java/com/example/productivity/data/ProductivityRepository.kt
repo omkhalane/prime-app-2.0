@@ -93,6 +93,14 @@ class ProductivityRepository(private val dao: ProductivityDao) {
 
     suspend fun setHabitDone(habitId: String, localDate: String, done: Boolean): ProductivityResult {
         if (!isValidIsoDate(localDate)) return ProductivityResult.Invalid("Date must be a valid yyyy-MM-dd calendar date.")
+        val habit = dao.habit(habitId) ?: return ProductivityResult.NotFound
+        val date = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(localDate) }.getOrNull()
+            ?: return ProductivityResult.Invalid("Calendar date is invalid.")
+        val calendar = java.util.Calendar.getInstance().apply { time = date }
+        val dayIndex = calendar.get(java.util.Calendar.DAY_OF_WEEK) - 1
+        if (done && habit.activeDaysMask and (1 shl dayIndex) == 0) {
+            return ProductivityResult.Invalid("This habit is not scheduled for the selected weekday.")
+        }
         if (done) dao.putCheckIn(ProductivityHabitCheckInEntity(habitId, localDate, System.currentTimeMillis()))
         else dao.removeCheckIn(habitId, localDate)
         return ProductivityResult.Success(habitId)
