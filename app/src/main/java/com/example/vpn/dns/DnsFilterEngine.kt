@@ -127,7 +127,7 @@ class DnsFilterEngine(
         }
 
         // Check DNS Cache
-        val cacheKey = "${domain}_${query.qtype}"
+        val cacheKey = "${domain}_${query.qtype}_${query.qclass}"
         val now = System.currentTimeMillis()
         val cached = dnsCache[cacheKey]
         if (cached != null && cached.expiresAt > now) {
@@ -143,8 +143,11 @@ class DnsFilterEngine(
         // Forward to upstream DNS resolver
         val upstreamResponse = forwardToUpstream(dnsPayload)
         if (upstreamResponse != null) {
-            // Cache response for 60 seconds
-            dnsCache[cacheKey] = CacheEntry(now + 60_000L, upstreamResponse)
+            val ttlSeconds = DnsPacketParser.minimumAnswerTtlSeconds(upstreamResponse)
+                ?.coerceIn(1L, 3600L) ?: 0L
+            if (ttlSeconds > 0L) {
+                dnsCache[cacheKey] = CacheEntry(System.currentTimeMillis() + ttlSeconds * 1000L, upstreamResponse)
+            }
             return DnsFilterResult.Allowed(upstreamResponse, domain)
         }
 
