@@ -758,7 +758,7 @@ class OpalRepository(private val context: Context? = null) {
         val remaining = if (running && !paused && deadline > 0L) {
             ((deadline - System.currentTimeMillis() + 999L) / 1000L).toInt().coerceAtLeast(0)
         } else stored
-        return Triple(remaining, selected, running && remaining > 0)
+        return Triple(remaining, selected, running)
     }
 
     fun clearStandardTimerState(selectedMinutes: Int = 30) {
