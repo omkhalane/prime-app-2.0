@@ -76,6 +76,9 @@ interface ProductivityDao {
     fun observeTaskCount(): Flow<Int>
 
     @Transaction
-    suspend fun completeTaskAndUpdate(id: String, now: Long): Boolean =
-        setTaskCompleted(id, now, now) > 0
+    suspend fun completeTaskAndInsertNext(id: String, now: Long, nextTask: ProductivityTaskEntity): Boolean {
+        if (setTaskCompleted(id, now, now) == 0) return false
+        insertTask(nextTask)
+        return true
+    }
 }
