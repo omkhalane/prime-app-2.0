@@ -434,6 +434,8 @@ fun HomeScreen(
                     }
                 }
 
+                ProductivityHubCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+
                 // Clean bottom padding for navigation bar
                 Spacer(modifier = Modifier.height(96.dp))
             }
