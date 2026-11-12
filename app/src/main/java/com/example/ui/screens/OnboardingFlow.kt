@@ -1240,7 +1240,23 @@ private fun AccessibilityGuideStep(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Why PRIME asks for this",
+                color = OpalMint,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "When enabled, PRIME checks which app is in the foreground and reads browser address-bar text to match your blocklist. This check runs on your device. PRIME does not need page contents or keystrokes. You can skip this permission, but app and browser blocking may be limited.",
+                color = OpalTextSecondary,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             val steps = listOf(
                 "Tap \"Installed apps\"",
