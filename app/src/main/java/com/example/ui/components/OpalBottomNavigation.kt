@@ -4,6 +4,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -37,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -66,8 +67,7 @@ fun OpalBottomNavigation(
         modifier = modifier
             .fillMaxWidth()
             .background(PrimeBackground)
-            .padding(top = 1.dp)
-            .background(Color(0xFF141414))
+            .drawBehind { drawLine(PrimeSubtleBorder, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
             .navigationBarsPadding()
             .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
