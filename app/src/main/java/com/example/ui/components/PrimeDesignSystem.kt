@@ -212,7 +212,7 @@ fun PrimeBackHeader(
             icon = Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = "Back",
             onClick = onBackClick,
-            containerSize = 44.dp,
+            containerSize = 48.dp,
             iconSize = 20.dp
         )
         Spacer(Modifier.width(12.dp))
