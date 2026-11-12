@@ -64,8 +64,7 @@ class BlocklistRepository(
             isPermanent = isPermanent,
             expiresAtMillis = if (isPermanent) 0L else System.currentTimeMillis() + durationMillis.coerceAtMost(365L * 24L * 60L * 60L * 1000L)
         )
-        domainDao.insertDomain(entity)
-        true
+        domainDao.insertDomain(entity) != -1L
     }
 
     suspend fun deleteDomain(domain: String) = withContext(Dispatchers.IO) {
