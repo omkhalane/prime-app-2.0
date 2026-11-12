@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +47,14 @@ import com.example.productivity.data.ProductivityResult
 import com.example.productivity.data.ProductivityTaskEntity
 import com.example.productivity.data.TaskPriority
 import com.example.productivity.data.TaskRecurrence
+import com.example.ui.theme.PrimeAccent
+import com.example.ui.theme.PrimeBackground
+import com.example.ui.theme.PrimeSubtleBorder
+import com.example.ui.theme.PrimeSurface
+import com.example.ui.theme.PrimeSurfaceElevated
+import com.example.ui.theme.PrimeTextPrimary
+import com.example.ui.theme.PrimeTextSecondary
+import com.example.ui.theme.PrimeTextTertiary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,45 +91,45 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
         return parsed.time
     }
 
-    Card(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF151B29))) {
+    Card(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, PrimeSubtleBorder), colors = CardDefaults.cardColors(containerColor = PrimeSurface)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.EventAvailable, contentDescription = null, tint = Color(0xFF8EBBFF))
+                Icon(Icons.Rounded.EventAvailable, contentDescription = null, tint = PrimeAccent)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                    Text("Daily Planner", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Tasks, priorities and daily habits", color = Color(0xFF9BA8BD), fontSize = 12.sp)
+                    Text("Daily Planner", color = PrimeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Tasks, priorities and daily habits", color = PrimeTextSecondary, fontSize = 12.sp)
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Flag, contentDescription = null, tint = Color(0xFFFFC477), modifier = Modifier.size(18.dp))
-                Text("  TASKS · ${tasks.count { it.completedAt != null }}/${tasks.size}", color = Color(0xFFCAD5E8), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Rounded.Flag, contentDescription = null, tint = PrimeAccent, modifier = Modifier.size(18.dp))
+                Text("  TASKS · ${tasks.count { it.completedAt != null }}/${tasks.size}", color = PrimeTextSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = { title=""; notes=""; dueDate=""; error=null; showTaskDialog=true }) { Icon(Icons.Rounded.Add, contentDescription="Add task", tint=Color.White) }
+                IconButton(onClick = { title=""; notes=""; dueDate=""; error=null; showTaskDialog=true }) { Icon(Icons.Rounded.Add, contentDescription="Add task", tint=PrimeTextPrimary) }
             }
-            if (tasks.isEmpty()) Text("No tasks yet. Add your first task.", color=Color(0xFF9BA8BD), fontSize=13.sp)
+            if (tasks.isEmpty()) Text("No tasks yet. Add your first task.", color=PrimeTextSecondary, fontSize=13.sp)
             tasks.forEach { task ->
                 TaskRow(task, onToggle = { done -> scope.launch { repository.setTaskDone(task.id, done) } }, onDelete = { scope.launch { repository.deleteTask(task.id) } })
             }
-            androidx.compose.material3.HorizontalDivider(color=Color(0xFF30394A))
+            androidx.compose.material3.HorizontalDivider(color=PrimeSubtleBorder)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.CheckCircle, contentDescription=null, tint=Color(0xFF7BE0B0), modifier=Modifier.size(18.dp))
+                Icon(Icons.Rounded.CheckCircle, contentDescription=null, tint=PrimeAccent, modifier=Modifier.size(18.dp))
                 Text("  HABITS · ${checkIns.count { check -> habits.any { it.id == check.habitId } }}/${habits.size} TODAY", color=Color(0xFFCAD5E8), fontSize=11.sp, fontWeight=FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick={ title=""; error=null; habitDays=setOf(0,1,2,3,4,5,6); showHabitDialog=true }) { Icon(Icons.Rounded.Add, contentDescription="Add habit", tint=Color.White) }
+                IconButton(onClick={ title=""; error=null; habitDays=setOf(0,1,2,3,4,5,6); showHabitDialog=true }) { Icon(Icons.Rounded.Add, contentDescription="Add habit", tint=PrimeTextPrimary) }
             }
-            if (habits.isEmpty()) Text("No habits configured. Add routines you want to track.", color=Color(0xFF9BA8BD), fontSize=13.sp)
+            if (habits.isEmpty()) Text("No habits configured. Add routines you want to track.", color=PrimeTextSecondary, fontSize=13.sp)
             habits.forEach { habit ->
                 val checked = checkIns.any { it.habitId == habit.id }
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(checked=checked, onCheckedChange={ done -> scope.launch { repository.setHabitDone(habit.id, today, done) } })
                     Column(Modifier.weight(1f)) {
                         Text(habit.title, color=if(checked) Color(0xFF7E8BA1) else Color.White, fontSize=14.sp)
-                        Text("Scheduled days: ${(0..6).filter { habit.activeDaysMask and (1 shl it) != 0 }.joinToString(",") { listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")[it] }}", color=Color(0xFF7E8BA1), fontSize=10.sp)
+                        Text("Scheduled days: ${(0..6).filter { habit.activeDaysMask and (1 shl it) != 0 }.joinToString(",") { listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")[it] }}", color=PrimeTextTertiary, fontSize=10.sp)
                     }
-                    IconButton(onClick={ scope.launch { repository.archiveHabit(habit.id) } }) { Icon(Icons.Rounded.DeleteOutline, contentDescription="Archive habit", tint=Color(0xFF9BA8BD)) }
+                    IconButton(onClick={ scope.launch { repository.archiveHabit(habit.id) } }) { Icon(Icons.Rounded.DeleteOutline, contentDescription="Archive habit", tint=PrimeTextSecondary) }
                 }
             }
-            Text("Saved on this device. No sample activity or placeholder records are generated.", color=Color(0xFF7E8BA1), fontSize=10.sp)
+            Text("Saved on this device. No sample activity or placeholder records are generated.", color=PrimeTextTertiary, fontSize=10.sp)
         }
     }
 
@@ -133,20 +142,20 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
                 OutlinedTextField(value=notes,onValueChange={ notes=it.take(2000) },label={ Text("Notes (optional)") })
                 OutlinedTextField(value=dueDate,onValueChange={ dueDate=it.take(10); error=null },label={ Text("Due date YYYY-MM-DD (optional)") },singleLine=true)
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text("Priority: ${priority.name}", color=Color.White)
+                    Text("Priority: ${priority.name}", color=PrimeTextPrimary)
                     TextButton(onClick={ priorityMenu=true }) { Text("Change") }
                     DropdownMenu(expanded=priorityMenu,onDismissRequest={priorityMenu=false}) {
                         TaskPriority.entries.forEach { value -> DropdownMenuItem(text={Text(value.name)},onClick={priority=value;priorityMenu=false}) }
                     }
                 }
                 Row(verticalAlignment=Alignment.CenterVertically) {
-                    Text("Repeat: ${recurrence.name}", color=Color.White)
+                    Text("Repeat: ${recurrence.name}", color=PrimeTextPrimary)
                     TextButton(onClick={recurrenceMenu=true}) { Text("Change") }
                     DropdownMenu(expanded=recurrenceMenu,onDismissRequest={recurrenceMenu=false}) {
                         TaskRecurrence.entries.forEach { value -> DropdownMenuItem(text={Text(value.name)},onClick={recurrence=value;recurrenceMenu=false}) }
                     }
                 }
-                error?.let { Text(it,color=Color(0xFFFF7777),fontSize=12.sp) }
+                error?.let { Text(it,color=Color(0xFFFF5B66),fontSize=12.sp) }
             }
         },
         confirmButton={ Button(enabled=!saving,onClick={
@@ -174,13 +183,13 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
         text={
             Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(value=title,onValueChange={title=it.take(60);error=null},label={Text("Habit name (2–60 characters)")},singleLine=true)
-                Text("Repeat on",color=Color.White,fontSize=13.sp)
+                Text("Repeat on",color=PrimeTextPrimary,fontSize=13.sp)
                 val days=listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")
                 days.forEachIndexed { index, day -> Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(checked=index in habitDays,onCheckedChange={checked -> habitDays=if(checked) habitDays+index else habitDays-index})
-                    Text(day,color=Color.White,fontSize=13.sp)
+                    Text(day,color=PrimeTextPrimary,fontSize=13.sp)
                 } }
-                error?.let { Text(it,color=Color(0xFFFF7777),fontSize=12.sp) }
+                error?.let { Text(it,color=Color(0xFFFF5B66),fontSize=12.sp) }
             }
         },
         confirmButton={Button(enabled=!saving,onClick={
@@ -206,8 +215,8 @@ private fun TaskRow(task: ProductivityTaskEntity, onToggle: (Boolean) -> Unit, o
         Column(Modifier.weight(1f)) {
             Text(task.title,color=if(task.completedAt!=null) Color(0xFF7E8BA1) else Color.White,fontSize=14.sp)
             val due = task.dueAt?.let { SimpleDateFormat("yyyy-MM-dd",Locale.ROOT).format(Date(it)) }
-            Text(listOf("Priority: ${TaskPriority.entries.firstOrNull { it.value==task.priority }?.name ?: "NORMAL"}",due?.let{"Due $it"},task.recurrence.takeIf{it!="NONE"}?.let{"Repeat $it"}).filterNotNull().joinToString(" · "),color=Color(0xFF7E8BA1),fontSize=10.sp)
+            Text(listOf("Priority: ${TaskPriority.entries.firstOrNull { it.value==task.priority }?.name ?: "NORMAL"}",due?.let{"Due $it"},task.recurrence.takeIf{it!="NONE"}?.let{"Repeat $it"}).filterNotNull().joinToString(" · "),color=PrimeTextTertiary,fontSize=10.sp)
         }
-        IconButton(onClick=onDelete) { Icon(Icons.Rounded.DeleteOutline,contentDescription="Delete task",tint=Color(0xFF9BA8BD)) }
+        IconButton(onClick=onDelete) { Icon(Icons.Rounded.DeleteOutline,contentDescription="Delete task",tint=PrimeTextSecondary) }
     }
 }
