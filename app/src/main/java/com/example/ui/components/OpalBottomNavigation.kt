@@ -77,7 +77,7 @@ fun OpalBottomNavigation(
         NavItem("Focus", NavigationTab.TIMER, Icons.Rounded.Timer, Icons.Outlined.Timer, currentTab, onTabSelected, "nav_focus_tab")
         NavItem("Shields", NavigationTab.MY_APPS, Icons.Rounded.Shield, Icons.Outlined.Shield, currentTab, onTabSelected, "nav_shields_tab")
         NavItem("Insights", NavigationTab.INSIGHTS, Icons.Rounded.BarChart, Icons.Outlined.BarChart, currentTab, onTabSelected, "nav_insights_tab")
-        NavItem("You", NavigationTab.PROFILE, Icons.Rounded.Person, Icons.Outlined.Person, currentTab, onTabSelected, "nav_profile_tab")
+        NavItem("Profile", NavigationTab.PROFILE, Icons.Rounded.Person, Icons.Outlined.Person, currentTab, onTabSelected, "nav_profile_tab")
     }
 }
 
