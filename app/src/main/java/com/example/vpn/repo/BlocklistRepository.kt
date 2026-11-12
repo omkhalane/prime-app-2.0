@@ -27,8 +27,8 @@ class BlocklistRepository(
     }
 
     private suspend fun seedInitialDataIfEmpty() = withContext(Dispatchers.IO) {
-        if (categoryDao.getCategoryCount() == 0) {
-            categoryDao.insertCategories(StarterWebsiteBlocklist.STARTER_CATEGORIES)
+        StarterWebsiteBlocklist.STARTER_CATEGORIES.forEach { category ->
+            if (categoryDao.getCategoryByName(category.name) == null) categoryDao.insertCategory(category)
         }
         if (domainDao.getDomainCount() == 0) {
             domainDao.insertDomains(StarterWebsiteBlocklist.STARTER_DOMAINS)
@@ -88,6 +88,8 @@ class BlocklistRepository(
     }
 
     suspend fun addCustomCategory(name: String, description: String, colorHex: Long) = withContext(Dispatchers.IO) {
+        require(name.isNotBlank())
+        require(categoryDao.getCategoryByName(name.trim()) == null) { "A category with this name already exists" }
         val cat = CategoryEntity(
             name = name.trim(),
             description = description.trim(),
