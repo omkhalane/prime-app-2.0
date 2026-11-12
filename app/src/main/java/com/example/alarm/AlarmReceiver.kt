@@ -94,7 +94,7 @@ class AlarmReceiver : BroadcastReceiver() {
         } catch (_: Throwable) { }
 
         // If it's a one-time alarm, disable it in repository
-        val repo = com.example.data.OpalRepository(context)
+        val repo = com.example.data.OpalRepository(context, loadAppsOnInit = false)
         repo.onAlarmTriggered(alarmId)
     }
 }
