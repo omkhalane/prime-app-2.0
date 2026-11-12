@@ -55,8 +55,7 @@ object AlarmSoundManager {
             val ringtoneManager = RingtoneManager(context).apply {
                 setType(RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE)
             }
-            val cursor: Cursor? = ringtoneManager.cursor
-            if (cursor != null) {
+            ringtoneManager.cursor?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
                     val uri = ringtoneManager.getRingtoneUri(cursor.position)
