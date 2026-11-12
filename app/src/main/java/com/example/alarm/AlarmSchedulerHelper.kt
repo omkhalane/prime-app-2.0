@@ -66,6 +66,7 @@ object AlarmSchedulerHelper {
         // For recurring, check next 7 days
         for (offset in 0..7) {
             val candidate = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
                 add(Calendar.DAY_OF_YEAR, offset)
                 set(Calendar.HOUR_OF_DAY, alarm.hour)
                 set(Calendar.MINUTE, alarm.minute)
@@ -84,14 +85,7 @@ object AlarmSchedulerHelper {
             }
         }
 
-        // Fallback next week
-        return Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, alarm.hour)
-            set(Calendar.MINUTE, alarm.minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        return null
     }
 
     /**
