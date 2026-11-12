@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.PrimeBackHeader
 import com.example.ui.components.PrimeGlassIconButton
+import com.example.ui.components.PrimeStatusPill
 import com.example.ui.theme.*
 import com.example.vpn.db.CategoryEntity
 import com.example.vpn.db.BlockedDomainEntity
@@ -85,7 +86,7 @@ fun WebsiteBlockerDashboard(
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(PrimeGlassCardBg).padding(18.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (isVpnRunning) "PROTECTION ACTIVE" else "PROTECTION INACTIVE", color = if (isVpnRunning) PrimeAccent else PrimeTextTertiary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    PrimeStatusPill(text = if (isVpnRunning) "Protection active" else "Protection inactive", color = if (isVpnRunning) PrimeAccent else PrimeTextTertiary)
                     Spacer(Modifier.height(6.dp))
                     Text(if (isVpnRunning) "Stay in control." else "Protect your focus.", color = PrimeTextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 }
@@ -116,8 +117,8 @@ fun WebsiteBlockerDashboard(
                 Icon(Icons.Rounded.Lock, null, tint = PrimeAccent)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("$activeRulesCount blocked domains", color = PrimeTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                    Text("Open to see domain names, categories and expiry", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Text("Blocked domains", color = PrimeTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text("$activeRulesCount active rules · View domains by category and duration", color = PrimeTextSecondary, fontSize = 12.sp)
                 }
                 Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, null, tint = PrimeTextTertiary, modifier = Modifier.size(15.dp))
             }
