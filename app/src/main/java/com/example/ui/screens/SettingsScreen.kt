@@ -101,7 +101,7 @@ fun SettingsScreen(
             if (showBackButton) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF161616))
                         .border(1.dp, Color(0x26FFFFFF), CircleShape)
