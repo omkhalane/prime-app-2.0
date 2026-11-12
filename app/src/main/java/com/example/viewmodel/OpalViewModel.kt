@@ -15,6 +15,7 @@ import com.example.model.ClockPreferences
 import com.example.model.BlockedAppItem
 import com.example.model.NavigationTab
 import com.example.model.OnboardingStep
+import com.example.model.OnboardingInputValidator
 import com.example.model.TimerPreset
 import com.example.model.UserProfile
 import com.example.model.PrimeBadge
@@ -1424,9 +1425,9 @@ class OpalViewModel(
     }
 
     fun setOnboardingName(name: String) {
-        val safeName = name.take(30)
+        val safeName = OnboardingInputValidator.normalizeName(name).take(30)
         _uiState.value = _uiState.value.copy(onboardingName = safeName)
-        if (safeName.trim().length in 2..30) repository.updateUserName(safeName.trim())
+        if (OnboardingInputValidator.isValidName(safeName)) repository.updateUserName(safeName)
     }
 
     fun setOnboardingGoal(goal: String) {
@@ -1452,8 +1453,8 @@ class OpalViewModel(
     fun nextOnboardingStep() {
         val current = _uiState.value.onboardingStep
         if (current == OnboardingStep.NAME_INPUT) {
-            val name = _uiState.value.onboardingName.trim().replace(Regex("\\s+"), " ")
-            if (name.length !in 2..30) {
+            val name = OnboardingInputValidator.normalizeName(_uiState.value.onboardingName)
+            if (!OnboardingInputValidator.isValidName(name)) {
                 _uiState.update { it.copy(snackbarMessage = "Enter a name between 2 and 30 characters.") }
                 return
             }
@@ -1481,7 +1482,7 @@ class OpalViewModel(
     }
 
     fun completeOnboarding() {
-        val name = _uiState.value.onboardingName.trim()
+        val name = OnboardingInputValidator.normalizeName(_uiState.value.onboardingName)
         if (name.length !in 2..30) {
             _uiState.update { it.copy(onboardingStep = OnboardingStep.NAME_INPUT, snackbarMessage = "Add your name before finishing setup.") }
             return
