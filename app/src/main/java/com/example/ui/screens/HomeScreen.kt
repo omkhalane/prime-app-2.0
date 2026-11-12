@@ -359,6 +359,9 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .testTag("home_website_blocker_card"),
                     shape = RoundedCornerShape(24.dp),
+                    backgroundColor = PrimeSurface,
+                    borderColor = PrimeSubtleBorder,
+                    borderBrush = null,
                     onClick = onOpenWebsiteBlocker
                 ) {
                     Column {
