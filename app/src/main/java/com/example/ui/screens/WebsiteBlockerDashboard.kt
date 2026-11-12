@@ -12,10 +12,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Plus
-import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -153,16 +153,16 @@ fun WebsiteBlockerDashboard(
             }
         }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(PrimeGlassCardBg).clickable(onClick = onOpenCategorySelection).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Plus, null, tint = PrimeAccent)
+            Icon(Icons.Rounded.Add, null, tint = PrimeAccent)
             Spacer(Modifier.width(12.dp))
             Text("Create a custom category", color = PrimeTextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Spacer(Modifier.weight(1f))
             Icon(Icons.AutoMirrored.Rounded.ArrowForwardIos, null, tint = PrimeTextTertiary, modifier = Modifier.size(15.dp))
         }
         Spacer(Modifier.height(22.dp))
-        ActionRow("Custom domains", "Add domains to your personal blocklist", Icons.Rounded.Shield, onOpenCustomBlocklist)
+        ActionRow("Custom domains", "Add domains to your personal blocklist", Icons.Rounded.Security, onOpenCustomBlocklist)
         Spacer(Modifier.height(10.dp))
-        ActionRow("Automated schedules", "Choose days, dates, times and categories", Icons.Rounded.CalendarMonth, onOpenSchedules)
+        ActionRow("Automated schedules", "Choose days, dates, times and categories", Icons.Rounded.Schedule, onOpenSchedules)
         Spacer(Modifier.height(32.dp))
     }
 }
