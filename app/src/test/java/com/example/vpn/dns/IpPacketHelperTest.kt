@@ -35,8 +35,9 @@ class IpPacketHelperTest {
         assertNull(IpPacketHelper.parseIpv4Udp(ipv4Udp(fragmentField = 0x2000), 31))
     }
 
-    @Test fun rejectsUdpLengthBeyondIpv4Payload() {
+    @Test fun rejectsUdpLengthBeyondOrShorterThanIpv4Payload() {
         assertNull(IpPacketHelper.parseIpv4Udp(ipv4Udp(udpLength = 20), 31))
+        assertNull(IpPacketHelper.parseIpv4Udp(ipv4Udp(udpLength = 10), 31))
     }
 
     @Test fun rejectsLengthLargerThanBackingArray() {
