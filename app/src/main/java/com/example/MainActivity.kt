@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricManager
 import androidx.fragment.app.FragmentActivity
@@ -126,7 +127,7 @@ fun OpalApp() {
     }
 
     // Android-managed biometric or device-credential authentication.
-    val activity = context as? FragmentActivity
+    val activity = context.findFragmentActivity()
     val requestDeviceReauth: (() -> Unit) -> Unit = { onAuthenticated ->
         if (!DeviceSecurityHelper.isDeviceSecure(context) || activity == null) {
             viewModel.onReauthFailure()
@@ -862,5 +863,14 @@ fun OpalApp() {
                 }
             }
         }
+    }
+}
+
+private fun Context.findFragmentActivity(): FragmentActivity? {
+    var current: Context = this
+    while (true) {
+        if (current is FragmentActivity) return current
+        if (current !is ContextWrapper) return null
+        current = current.baseContext
     }
 }
