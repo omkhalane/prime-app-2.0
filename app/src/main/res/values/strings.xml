@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Prime</string>
     <string name="app_tagline">BECOME YOUR PRIME</string>
-    <string name="accessibility_service_description">Prime uses this service to detect when distracting apps or blocked websites are opened in Google Chrome and other browsers, helping you protect your focus.</string>
+    <string name="accessibility_service_description">PRIME uses this service to identify the foreground app and read browser address-bar text to match your blocklist. This check runs on your device. PRIME does not need page contents or keystrokes. Blocking may be limited if the service is disabled.</string>
 </resources>
