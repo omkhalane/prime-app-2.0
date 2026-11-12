@@ -4,7 +4,6 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.content.Context
-import androidx.activity.ComponentActivity
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricManager
 import androidx.fragment.app.FragmentActivity
