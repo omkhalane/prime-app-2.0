@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -81,7 +82,7 @@ fun OpalBottomNavigation(
 }
 
 @Composable
-private fun NavItem(
+private fun RowScope.NavItem(
     label: String,
     tab: NavigationTab,
     activeIcon: ImageVector,
