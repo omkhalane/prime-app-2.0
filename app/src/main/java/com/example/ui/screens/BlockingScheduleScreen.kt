@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -305,7 +307,7 @@ fun BlockingScheduleScreen(
                     .border(BorderStroke(1.dp, Color(0xFF262626)), RoundedCornerShape(22.dp))
                     .padding(20.dp)
             ) {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text(
                         text = "Create Blocking Schedule",
                         color = PrimeTextPrimary,
