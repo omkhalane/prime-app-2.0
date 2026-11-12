@@ -68,6 +68,9 @@ interface WebsiteCategoryDao {
     @Query("DELETE FROM website_categories WHERE name = :name AND isCustom = 1")
     suspend fun deleteCustomCategory(name: String)
 
+    @Query("SELECT * FROM website_categories WHERE name = :name LIMIT 1")
+    suspend fun getCategoryByName(name: String): CategoryEntity?
+
     @Query("SELECT COUNT(*) FROM website_categories")
     suspend fun getCategoryCount(): Int
 }
