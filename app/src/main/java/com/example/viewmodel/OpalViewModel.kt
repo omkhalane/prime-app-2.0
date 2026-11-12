@@ -1687,6 +1687,11 @@ class OpalViewModel(
     fun deleteCustomWebsiteDomain(domain: String) {
         viewModelScope.launch {
             blockingManager?.blocklistRepo?.deleteDomain(domain)
+            val appWebsite = repository.appsFlow.value.firstOrNull {
+                it.isWebsite && com.example.vpn.dns.DomainMatcher.normalize(it.name) ==
+                    com.example.vpn.dns.DomainMatcher.normalize(domain)
+            }
+            appWebsite?.let { repository.removeBlockedApp(it.id) }
             blockingManager?.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Removed $domain") }
         }
