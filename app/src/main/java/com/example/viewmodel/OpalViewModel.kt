@@ -1307,7 +1307,7 @@ class OpalViewModel(
     }
 
     fun closeCategorySheet() {
-        _uiState.value = _uiState.value.copy(activeCategorySheet = null)
+        _uiState.value = _uiState.value.copy(activeCategorySheet = null, isNeverAllowedUnlocked = false)
     }
 
     fun onReauthSuccess() {
