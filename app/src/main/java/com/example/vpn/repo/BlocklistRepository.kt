@@ -39,6 +39,9 @@ class BlocklistRepository(
 
     fun getActiveBlockedDomains(): Flow<List<BlockedDomainEntity>> = domainDao.getActiveBlockedDomains()
 
+    suspend fun isDomainPermanent(domain: String): Boolean =
+        domainDao.getDomainByName(DomainMatcher.normalize(domain))?.isPermanent == true
+
     fun getDomainsByCategory(category: String): Flow<List<BlockedDomainEntity>> = domainDao.getDomainsByCategory(category)
 
     fun getAllCategories(): Flow<List<CategoryEntity>> = categoryDao.getAllCategories()
