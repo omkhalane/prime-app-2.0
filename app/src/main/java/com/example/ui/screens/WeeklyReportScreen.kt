@@ -114,7 +114,7 @@ fun WeeklyReportScreen(
                     icon = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Back",
                     onClick = onBackClick,
-                    containerSize = 40.dp,
+                    containerSize = 44.dp,
                     iconSize = 20.dp
                 )
                 Spacer(modifier = Modifier.width(12.dp))
