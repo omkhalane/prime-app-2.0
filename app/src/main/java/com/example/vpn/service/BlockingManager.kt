@@ -2,12 +2,16 @@ package com.example.vpn.service
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.example.service.OpalAccessibilityService
 import com.example.vpn.repo.BlockingAnalyticsRepository
 import com.example.vpn.repo.BlockingScheduleRepository
 import com.example.vpn.repo.BlocklistRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +23,7 @@ import kotlinx.coroutines.withContext
 class BlockingManager private constructor(private val context: Context) {
 
     companion object {
+        private const val TAG = "BlockingManager"
         @Volatile
         private var INSTANCE: BlockingManager? = null
 
@@ -34,7 +39,8 @@ class BlockingManager private constructor(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("prime_blocking_manager_prefs", Context.MODE_PRIVATE)
     // Keep measured protection time beside PRIME's verified wellbeing counters.
     private val wellbeingPrefs: SharedPreferences = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val reconcileMutex = Mutex()
     @Volatile private var lastBlockingCheckpointMillis: Long? = null
 
     val blocklistRepo = BlocklistRepository(context)
@@ -54,17 +60,18 @@ class BlockingManager private constructor(private val context: Context) {
 
     // Focus Session active state
     @Volatile private var isSessionActive = prefs.getBoolean("focus_session_active", false)
-    private val sessionBlockedDomains = (prefs.getStringSet("focus_session_domains", emptySet()) ?: emptySet()).toMutableSet()
-    private val sessionBlockedCategories = (prefs.getStringSet("focus_session_categories", emptySet()) ?: emptySet()).toMutableSet()
+    @Volatile private var sessionBlockedDomains: Set<String> =
+        (prefs.getStringSet("focus_session_domains", emptySet()) ?: emptySet()).toSet()
+    @Volatile private var sessionBlockedCategories: Set<String> =
+        (prefs.getStringSet("focus_session_categories", emptySet()) ?: emptySet()).toSet()
 
     init {
         BlockingRecoveryManager.enqueuePeriodicReconciliation(context)
         scope.launch {
-            reconcileActiveRules()
             while (isActive) {
-                // Re-evaluate date/time rules at their boundaries even when the UI is closed.
+                runCatching { reconcileActiveRules() }
+                    .onFailure { Log.w(TAG, "Blocking reconciliation failed; will retry", it) }
                 delay(30_000L)
-                reconcileActiveRules()
             }
         }
     }
@@ -152,21 +159,17 @@ class BlockingManager private constructor(private val context: Context) {
         activeMap
     }
 
-    suspend fun reconcileActiveRules() {
+    suspend fun reconcileActiveRules() = reconcileMutex.withLock {
         val rules = resolveCurrentActiveRules()
         _activeRulesCount.value = rules.size
-
-        // Should the VPN be running?
-        val shouldRun = _isPermanentProtectionEnabled.value || isSessionActive || scheduleRepo.getCurrentlyActiveSchedules().isNotEmpty()
+        val shouldRun = _isPermanentProtectionEnabled.value || isSessionActive ||
+            scheduleRepo.getCurrentlyActiveSchedules().isNotEmpty()
 
         if (shouldRun && !PrimeVpnService.isServiceRunning) {
-            if (VpnPermissionManager.isVpnPrepared(context)) {
-                PrimeVpnService.startService(context)
-            }
+            if (VpnPermissionManager.isVpnPrepared(context)) PrimeVpnService.startService(context)
         } else if (!shouldRun && PrimeVpnService.isServiceRunning) {
             PrimeVpnService.stopService(context)
         } else if (PrimeVpnService.isServiceRunning) {
-            // Signal service to reload in-memory rules
             val intent = android.content.Intent(context, PrimeVpnService::class.java).apply {
                 action = PrimeVpnService.ACTION_RELOAD_RULES
             }
@@ -188,13 +191,11 @@ class BlockingManager private constructor(private val context: Context) {
         blockedCategories: Set<String> = emptySet()
     ) {
         isSessionActive = true
-        sessionBlockedDomains.clear()
-        sessionBlockedDomains.addAll(blockedDomains)
-        sessionBlockedCategories.clear()
-        sessionBlockedCategories.addAll(blockedCategories)
+        sessionBlockedDomains = blockedDomains.filter { it.isNotBlank() }.toSet()
+        sessionBlockedCategories = blockedCategories.filter { it.isNotBlank() }.toSet()
         prefs.edit().putBoolean("focus_session_active", true)
-            .putStringSet("focus_session_domains", sessionBlockedDomains.toSet())
-            .putStringSet("focus_session_categories", sessionBlockedCategories.toSet()).apply()
+            .putStringSet("focus_session_domains", sessionBlockedDomains)
+            .putStringSet("focus_session_categories", sessionBlockedCategories).apply()
         scope.launch {
             reconcileActiveRules()
         }
@@ -202,8 +203,8 @@ class BlockingManager private constructor(private val context: Context) {
 
     fun onFocusSessionEnded() {
         isSessionActive = false
-        sessionBlockedDomains.clear()
-        sessionBlockedCategories.clear()
+        sessionBlockedDomains = emptySet()
+        sessionBlockedCategories = emptySet()
         prefs.edit().putBoolean("focus_session_active", false)
             .remove("focus_session_domains").remove("focus_session_categories").apply()
         scope.launch {
