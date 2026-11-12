@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -59,7 +61,7 @@ fun WebsiteBlockerDashboard(
     )
     Column(
         modifier = modifier.fillMaxSize().background(PrimeBackground)
-            .statusBarsPadding().verticalScroll(androidx.compose.foundation.rememberScrollState())
+            .statusBarsPadding().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp).testTag("website_blocker_dashboard")
     ) {
         Spacer(Modifier.height(12.dp))
