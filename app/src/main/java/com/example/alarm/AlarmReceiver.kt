@@ -26,10 +26,10 @@ class AlarmReceiver : BroadcastReceiver() {
         val vibration = intent.getBooleanExtra(AlarmSchedulerHelper.EXTRA_ALARM_VIBRATION, true)
         val snoozeMin = intent.getIntExtra(AlarmSchedulerHelper.EXTRA_ALARM_SNOOZE_MINUTES, 10)
 
-        // Acquire a brief wake lock to ensure device stays awake to show UI
+        // Keep the CPU awake briefly while alarm audio and the full-screen notification start
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val wakeLock = powerManager?.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+            PowerManager.PARTIAL_WAKE_LOCK,
             "prime:AlarmWakeLock"
         )
         wakeLock?.acquire(30_000L)
