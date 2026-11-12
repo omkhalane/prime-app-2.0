@@ -88,16 +88,16 @@ fun SettingsScreen(
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Top bar with back button and title
+        // Profile header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF16191D))
+                    .background(Color(0xFF161616))
                     .border(1.dp, Color(0x26FFFFFF), CircleShape)
                     .clickable { onBackClick() }
                     .testTag("settings_back_button"),
@@ -110,14 +110,21 @@ fun SettingsScreen(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Settings",
-                color = OpalTextPrimary,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = (-0.4).sp
-            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Text(
+                    text = "Your profile",
+                    color = OpalTextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.4).sp
+                )
+                Text(
+                    text = "Personalize your PRIME experience",
+                    color = OpalTextSecondary,
+                    fontSize = 13.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
