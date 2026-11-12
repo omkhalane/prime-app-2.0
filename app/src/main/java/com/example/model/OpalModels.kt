@@ -48,7 +48,7 @@ data class TimerPreset(
 )
 
 data class UserProfile(
-    val name: String = "omk",
+    val name: String = "You",
     val streakDays: Int = 0,
     val bestStreakDays: Int = 0,
     val isActiveToday: Boolean = false,
