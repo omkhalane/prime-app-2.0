@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.example.service.OpalAccessibilityService
+import com.example.data.OpalRepository
 import com.example.vpn.repo.BlockingAnalyticsRepository
 import com.example.vpn.repo.BlockingScheduleRepository
 import com.example.vpn.repo.BlocklistRepository
@@ -69,8 +70,10 @@ class BlockingManager private constructor(private val context: Context) {
         BlockingRecoveryManager.enqueuePeriodicReconciliation(context)
         scope.launch {
             while (isActive) {
-                runCatching { reconcileActiveRules() }
-                    .onFailure { Log.w(TAG, "Blocking reconciliation failed; will retry", it) }
+                runCatching {
+                    OpalRepository.syncTimeBasedRuleBlocking(context)
+                    reconcileActiveRules()
+                }.onFailure { Log.w(TAG, "Blocking reconciliation failed; will retry", it) }
                 delay(30_000L)
             }
         }
