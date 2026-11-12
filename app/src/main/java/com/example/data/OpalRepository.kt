@@ -77,7 +77,7 @@ class OpalRepository(private val context: Context? = null) {
                     val apps = rule.optJSONArray("blocked_apps") ?: continue
                     if (apps.length() == 0) continue
                     val dayArray = rule.optJSONArray("active_days")
-                    val days = if (dayArray == null || dayArray.length() == 0) setOf(0, 1, 2, 3, 4)
+                    val days = if (dayArray == null) setOf(0, 1, 2, 3, 4)
                     else (0 until dayArray.length()).mapNotNull { dayArray.optInt(it, -1).takeIf { d -> d in 0..6 } }.toSet()
                     if (days.isEmpty()) continue
                     val start = parseRuleTime(rule.optString("from_time", "9:00 am")) ?: continue
@@ -402,7 +402,7 @@ class OpalRepository(private val context: Context? = null) {
                         fromTime = obj.optString("from_time", "9:00 am"),
                         toTime = obj.optString("to_time", "5:00 pm"),
                         daysLabel = obj.optString("days_label", "Weekdays"),
-                        activeDays = activeDaysSet.ifEmpty { setOf(0, 1, 2, 3, 4) },
+                        activeDays = if (daysArr == null) setOf(0, 1, 2, 3, 4) else activeDaysSet,
                         blockedAppIds = blockedAppsList,
                         isHardMode = obj.optBoolean("is_hard_mode", false),
                         allowBreaks = obj.optBoolean("allow_breaks", true),
@@ -411,7 +411,7 @@ class OpalRepository(private val context: Context? = null) {
                     )
                 )
             }
-            return list.ifEmpty { defaultRules }
+            return list
         } catch (_: Throwable) {
             return defaultRules
         }
@@ -954,7 +954,7 @@ class OpalRepository(private val context: Context? = null) {
                         name = obj.optString("name", "Alarm"),
                         isEnabled = obj.optBoolean("is_enabled", true),
                         recurrence = AlarmRecurrence.valueOf(obj.optString("recurrence", "DAILY")),
-                        selectedDays = daysSet.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                        selectedDays = if (daysArr == null) setOf(1, 2, 3, 4, 5) else daysSet,
                         specificDateMillis = if (obj.has("specific_date")) obj.getLong("specific_date") else null,
                         ringtoneId = obj.optString("ringtone_id", "zen_crystal"),
                         ringtoneName = obj.optString("ringtone_name", "Zen Crystal Chime"),
@@ -966,7 +966,7 @@ class OpalRepository(private val context: Context? = null) {
                     )
                 )
             }
-            list.ifEmpty { defaultAlarms }
+            list
         } catch (_: Throwable) {
             defaultAlarms
         }
