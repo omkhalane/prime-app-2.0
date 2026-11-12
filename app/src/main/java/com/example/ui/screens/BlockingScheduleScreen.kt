@@ -55,12 +55,14 @@ import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeTextSecondary
 import com.example.ui.theme.PrimeTextTertiary
 import com.example.vpn.db.BlockingScheduleEntity
+import com.example.vpn.db.CategoryEntity
 
 @Composable
 fun BlockingScheduleScreen(
     schedules: List<BlockingScheduleEntity>,
     onBackClick: () -> Unit,
-    onAddSchedule: (title: String, startH: Int, startM: Int, endH: Int, endM: Int, days: Set<Int>, categories: Set<String>) -> Unit,
+    onAddSchedule: (title: String, startH: Int, startM: Int, endH: Int, endM: Int, days: Set<Int>, categories: Set<String>, startDateIso: String?, endDateIso: String?) -> Unit,
+    categories: List<CategoryEntity> = emptyList(),
     onToggleSchedule: (String, Boolean) -> Unit,
     onDeleteSchedule: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -285,6 +287,8 @@ fun BlockingScheduleScreen(
         var endM by remember { mutableStateOf(0) }
         var selectedDays by remember { mutableStateOf(setOf(1, 2, 3, 4, 5)) } // Weekdays (Mon-Fri)
         var selectedCats by remember { mutableStateOf(setOf("Social Media", "Video Streaming", "Entertainment")) }
+        var startDateIso by remember { mutableStateOf("") }
+        var endDateIso by remember { mutableStateOf("") }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { isAddDialogOpen = false }) {
             Box(
@@ -323,7 +327,14 @@ fun BlockingScheduleScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Text("Active Weekdays", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Text("Date range (optional, yyyy-MM-dd)", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = startDateIso, onValueChange = { startDateIso = it.take(10) }, label = { Text("From date") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = endDateIso, onValueChange = { endDateIso = it.take(10) }, label = { Text("To date") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(12.dp))
+
+                    Text("Active days", color = PrimeTextSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
                     Row(
@@ -353,6 +364,17 @@ fun BlockingScheduleScreen(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("Blocked categories", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    (categories.map { it.name }.ifEmpty { selectedCats.toList() }).forEach { categoryName ->
+                        Row(Modifier.fillMaxWidth().clickable { selectedCats = if (categoryName in selectedCats) selectedCats - categoryName else selectedCats + categoryName }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = categoryName in selectedCats, onCheckedChange = { checked -> selectedCats = if (checked) selectedCats + categoryName else selectedCats - categoryName })
+                            Spacer(Modifier.width(8.dp))
+                            Text(categoryName, color = PrimeTextPrimary, fontSize = 13.sp)
+                        }
+                    }
 
                     Text(
                         text = "Time Window: ${String.format("%02d:%02d", startH, startM)} – ${String.format("%02d:%02d", endH, endM)}",
@@ -386,7 +408,7 @@ fun BlockingScheduleScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(PrimeAccent)
                                 .clickable {
-                                    onAddSchedule(scheduleTitle, startH, startM, endH, endM, selectedDays, selectedCats)
+                                    onAddSchedule(scheduleTitle, startH, startM, endH, endM, selectedDays, selectedCats, startDateIso.ifBlank { null }, endDateIso.ifBlank { null })
                                     isAddDialogOpen = false
                                 },
                             contentAlignment = Alignment.Center
