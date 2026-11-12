@@ -59,7 +59,7 @@ object IpPacketHelper {
             val destPort = buffer.short.toInt() and 0xFFFF
             val udpLength = buffer.short.toInt() and 0xFFFF
             buffer.short
-            if (udpLength < 8 || udpLength > totalLength - ihl) return null
+            if (udpLength < 8 || udpLength != totalLength - ihl) return null
             val payloadLength = udpLength - 8
             if (buffer.remaining() < payloadLength) return null
             val payload = ByteArray(payloadLength)
@@ -137,7 +137,7 @@ object IpPacketHelper {
         val destPort = buffer.short.toInt() and 0xFFFF
         val udpLength = buffer.short.toInt() and 0xFFFF
         buffer.short
-        if (udpLength < 8 || udpLength > payloadLength || buffer.remaining() < udpLength - 8) return null
+        if (udpLength < 8 || udpLength != payloadLength || buffer.remaining() < udpLength - 8) return null
         val payload = ByteArray(udpLength - 8)
         buffer.get(payload)
         return ParsedUdpPacket(sourceIp, destIp, sourcePort, destPort, payload)
