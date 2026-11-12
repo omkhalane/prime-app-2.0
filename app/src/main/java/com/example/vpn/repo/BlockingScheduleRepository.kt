@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.text.ParsePosition
 
 class BlockingScheduleRepository(
@@ -34,13 +35,15 @@ class BlockingScheduleRepository(
     ) = withContext(Dispatchers.IO) {
         require(startHour in 0..23 && endHour in 0..23)
         require(startMinute in 0..59 && endMinute in 0..59)
+        require(activeDays.isNotEmpty()) { "Select at least one active day" }
         require(activeDays.all { it in 0..6 })
+        require(categories.isNotEmpty() || customDomains.isNotEmpty()) { "Select at least one blocking category or domain" }
         require(startDateIso == null || isValidDate(startDateIso))
         require(endDateIso == null || isValidDate(endDateIso))
         require(startDateIso == null || endDateIso == null || startDateIso <= endDateIso)
         scheduleDao.insertSchedule(
             BlockingScheduleEntity(
-                id = "sched_${System.currentTimeMillis()}",
+                id = "sched_${UUID.randomUUID()}",
                 title = title.trim().ifBlank { "Website blocking" },
                 startHour = startHour,
                 startMinute = startMinute,
