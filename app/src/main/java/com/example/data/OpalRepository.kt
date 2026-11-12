@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.Locale
 import java.text.SimpleDateFormat
 import java.text.ParsePosition
 
@@ -49,7 +50,7 @@ class OpalRepository(private val context: Context? = null) {
                     OpalAccessibilityService.blockedWebsites.isNotEmpty()
         }
 
-        private fun activeRulePackages(json: String?, nowMillis: Long): Set<String> {
+        internal fun activeRulePackages(json: String?, nowMillis: Long): Set<String> {
             if (json.isNullOrBlank()) return emptySet()
             val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
             val minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
