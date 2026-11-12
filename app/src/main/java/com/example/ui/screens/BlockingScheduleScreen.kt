@@ -285,6 +285,8 @@ fun BlockingScheduleScreen(
         var startM by remember { mutableStateOf(0) }
         var endH by remember { mutableStateOf(17) }
         var endM by remember { mutableStateOf(0) }
+        var startTimeText by remember { mutableStateOf("09:00") }
+        var endTimeText by remember { mutableStateOf("17:00") }
         var selectedDays by remember { mutableStateOf(setOf(1, 2, 3, 4, 5)) } // Weekdays (Mon-Fri)
         var selectedCats by remember { mutableStateOf(setOf("Social Media", "Video Streaming", "Entertainment")) }
         var startDateIso by remember { mutableStateOf("") }
@@ -376,8 +378,11 @@ fun BlockingScheduleScreen(
                         }
                     }
 
+                    OutlinedTextField(value = startTimeText, onValueChange = { startTimeText = it.take(5) }, label = { Text("Start time (HH:mm)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = endTimeText, onValueChange = { endTimeText = it.take(5) }, label = { Text("End time (HH:mm)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Text(
-                        text = "Time Window: ${String.format("%02d:%02d", startH, startM)} – ${String.format("%02d:%02d", endH, endM)}",
+                        text = "Time Window: $startTimeText – $endTimeText",
                         color = PrimeAccent,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
@@ -408,7 +413,12 @@ fun BlockingScheduleScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(PrimeAccent)
                                 .clickable {
-                                    onAddSchedule(scheduleTitle, startH, startM, endH, endM, selectedDays, selectedCats, startDateIso.ifBlank { null }, endDateIso.ifBlank { null })
+                                    val startParts = startTimeText.split(":").mapNotNull { it.toIntOrNull() }
+                                    val endParts = endTimeText.split(":").mapNotNull { it.toIntOrNull() }
+                                    if (startParts.size == 2 && endParts.size == 2 && startParts[0] in 0..23 && endParts[0] in 0..23 && startParts[1] in 0..59 && endParts[1] in 0..59 && selectedDays.isNotEmpty()) {
+                                        onAddSchedule(scheduleTitle, startParts[0], startParts[1], endParts[0], endParts[1], selectedDays, selectedCats, startDateIso.ifBlank { null }, endDateIso.ifBlank { null })
+                                        isAddDialogOpen = false
+                                    }
                                     isAddDialogOpen = false
                                 },
                             contentAlignment = Alignment.Center
