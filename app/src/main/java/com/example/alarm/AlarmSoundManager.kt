@@ -96,20 +96,30 @@ object AlarmSoundManager {
 
         if (ringtoneUriString != null && ringtoneUriString.isNotBlank()) {
             try {
-                val uri = Uri.parse(ringtoneUriString)
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    setDataSource(context, uri)
-                    isLooping = true
-                    setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
-                    prepare()
-                    start()
+                val player = MediaPlayer()
+                mediaPlayer = player
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                player.setDataSource(context, Uri.parse(ringtoneUriString))
+                player.isLooping = true
+                player.setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
+                player.setOnPreparedListener { prepared ->
+                    if (mediaPlayer === prepared && !muted) prepared.start()
                 }
+                player.setOnErrorListener { failed, _, _ ->
+                    if (mediaPlayer === failed) {
+                        mediaPlayer = null
+                        try { failed.release() } catch (_: Throwable) { }
+                        startSyntheticToneLoop(ringtoneId)
+                    }
+                    true
+                }
+                // Avoid blocking the BroadcastReceiver/UI thread while resolving ringtone URIs.
+                player.prepareAsync()
                 if (fadeIn) {
                     fadeJob?.cancel()
                     fadeJob = scope.launch {
@@ -151,32 +161,45 @@ object AlarmSoundManager {
 
         if (!option.isSynthetic && option.uriString != null) {
             try {
-                val uri = Uri.parse(option.uriString)
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    setDataSource(context, uri)
-                    isLooping = false
-                    setOnCompletionListener {
-                        stopPlayback(context)
+                val player = MediaPlayer()
+                mediaPlayer = player
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                player.setDataSource(context, Uri.parse(option.uriString))
+                player.isLooping = false
+                player.setOnPreparedListener { prepared ->
+                    if (mediaPlayer === prepared) prepared.start()
+                }
+                player.setOnCompletionListener { completed ->
+                    if (mediaPlayer === completed) {
+                        mediaPlayer = null
+                        completed.release()
                         onFinished?.invoke()
                     }
-                    prepare()
-                    start()
                 }
+                player.setOnErrorListener { failed, _, _ ->
+                    if (mediaPlayer === failed) {
+                        mediaPlayer = null
+                        try { failed.release() } catch (_: Throwable) { }
+                        onFinished?.invoke()
+                    }
+                    true
+                }
+                player.prepareAsync()
                 return
             } catch (_: Throwable) {
-                // Fallback
+                try { mediaPlayer?.release() } catch (_: Throwable) { }
+                mediaPlayer = null
+                // Fall back to the built-in preview.
             }
         }
 
         syntheticToneJob = scope.launch {
             playSyntheticToneOnce(option.id)
-            delay(4000L)
             onFinished?.invoke()
         }
     }
