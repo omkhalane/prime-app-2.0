@@ -3,9 +3,12 @@ package com.example
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
-import android.app.Activity
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager
+import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -75,7 +78,7 @@ import com.example.util.PermissionHelper
 import com.example.viewmodel.OpalViewModel
 import com.example.viewmodel.TimerToolSubscreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -123,31 +126,38 @@ fun OpalApp() {
         viewModel.nextOnboardingStep()
     }
 
-    // Launcher for real Android System Device Credentials (Lock Screen PIN / Pattern / Password / Biometrics)
-    val confirmDeviceCredentialLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val pending = pendingSystemAuthAction.value
-        pendingSystemAuthAction.value = null
-        if (result.resultCode == Activity.RESULT_OK) {
-            pending?.invoke() ?: viewModel.onReauthSuccess()
-        } else {
-            viewModel.onReauthFailure()
-        }
-    }
-
+    // Android-managed biometric or device-credential authentication.
+    val activity = context as? FragmentActivity
     val requestDeviceReauth: (() -> Unit) -> Unit = { onAuthenticated ->
-        if (!DeviceSecurityHelper.isDeviceSecure(context)) {
+        if (!DeviceSecurityHelper.isDeviceSecure(context) || activity == null) {
             viewModel.onReauthFailure()
         } else {
-            val intent = DeviceSecurityHelper.createConfirmDeviceCredentialIntent(context)
-            if (intent != null) {
-                pendingSystemAuthAction.value = onAuthenticated
-                confirmDeviceCredentialLauncher.launch(intent)
-            } else {
-                pendingSystemAuthAction.value = null
-                viewModel.onReauthFailure()
-            }
+            val prompt = BiometricPrompt(
+                activity,
+                ContextCompat.getMainExecutor(activity),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        val pending = pendingSystemAuthAction.value
+                        pendingSystemAuthAction.value = null
+                        pending?.invoke() ?: onAuthenticated()
+                    }
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        pendingSystemAuthAction.value = null
+                        viewModel.onReauthFailure()
+                    }
+                }
+            )
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Verify it's you")
+                .setSubtitle("Use your fingerprint, biometrics or phone screen lock")
+                .setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
+                .build()
+            pendingSystemAuthAction.value = onAuthenticated
+            prompt.authenticate(promptInfo)
         }
     }
 
