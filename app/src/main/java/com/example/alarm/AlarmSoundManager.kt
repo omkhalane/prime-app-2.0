@@ -26,7 +26,7 @@ import kotlin.math.sin
 
 object AlarmSoundManager {
 
-    private var mediaPlayer: MediaPlayer? = null
+    @Volatile private var mediaPlayer: MediaPlayer? = null
     private var syntheticToneJob: Job? = null
     private var vibratorJob: Job? = null
     private var vibrator: Vibrator? = null
