@@ -148,14 +148,19 @@ fun OpalApp() {
                     }
                 }
             )
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            val promptBuilder = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Verify it's you")
                 .setSubtitle("Use your fingerprint, biometrics or phone screen lock")
-                .setAllowedAuthenticators(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                promptBuilder.setAllowedAuthenticators(
                     BiometricManager.Authenticators.BIOMETRIC_STRONG or
                         BiometricManager.Authenticators.DEVICE_CREDENTIAL
                 )
-                .build()
+            } else {
+                @Suppress("DEPRECATION")
+                promptBuilder.setDeviceCredentialAllowed(true)
+            }
+            val promptInfo = promptBuilder.build()
             pendingSystemAuthAction.value = onAuthenticated
             prompt.authenticate(promptInfo)
         }
@@ -800,7 +805,10 @@ fun OpalApp() {
                         },
                         onTogglePermanent = { domain, isPermanent ->
                             if (!isPermanent) {
-                                requestDeviceReauth { viewModel.toggleWebsitePermanent(domain, false) }
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
                             } else {
                                 viewModel.toggleWebsitePermanent(domain, true)
                             }
@@ -808,7 +816,10 @@ fun OpalApp() {
                         onToggleEnabled = { domain, isBlocked ->
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true && !isBlocked) {
-                                requestDeviceReauth { viewModel.toggleWebsiteDomain(domain, false) }
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
                             } else {
                                 viewModel.toggleWebsiteDomain(domain, isBlocked)
                             }
