@@ -270,8 +270,8 @@ class WellbeingRepository(private val context: Context) {
             val appLabel = getAppName(pkg)
             val cat = getAppCategory(pkg)
             val hasEvents = packagesWithEvents.contains(pkg)
-            val opens = if (sawOpenEvent) openCounts[pkg] ?: 0 else null
-            val notifications = if (sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
+            val opens = if (eventQuerySucceeded && sawOpenEvent) openCounts[pkg] ?: 0 else null
+            val notifications = if (eventQuerySucceeded && sawNotificationEvent) notificationCounts[pkg] ?: 0 else null
             AppUsageData(pkg, appLabel, duration, cat, opens, notifications)
         }.sortedByDescending { it.totalTimeMs }
 
