@@ -36,6 +36,8 @@ class OpalAccessibilityService : AccessibilityService() {
             private set
 
         private val websiteCategoryMap = ConcurrentHashMap<String, String>()
+        @Volatile private var managedBlockedWebsites: Set<String> = emptySet()
+        @Volatile private var customBlockedWebsites: Set<String> = emptySet()
 
         private val snoozedPackagesUntilMap = ConcurrentHashMap<String, Long>()
         private val snoozedWebsitesUntilMap = ConcurrentHashMap<String, Long>()
@@ -82,14 +84,21 @@ class OpalAccessibilityService : AccessibilityService() {
         }
 
         fun updateBlockedWebsites(domains: Collection<String>, categories: Map<String, String> = emptyMap()) {
-            val normalized = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
-            blockedWebsites = normalized
+            managedBlockedWebsites = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
+            blockedWebsites = managedBlockedWebsites + customBlockedWebsites
             websiteCategoryMap.clear()
             categories.forEach { (d, cat) ->
                 websiteCategoryMap[normalizeDomain(d)] = cat
             }
             isBlockingActive = blockedPackages.isNotEmpty() || blockedWebsites.isNotEmpty()
             safeLog(Log.DEBUG, TAG, "Updated blocked websites count: ${blockedWebsites.size}")
+        }
+
+        /** Replaces only app-level custom websites without erasing VPN/category rules. */
+        fun updateCustomBlockedWebsites(domains: Collection<String>) {
+            customBlockedWebsites = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
+            blockedWebsites = managedBlockedWebsites + customBlockedWebsites
+            isBlockingActive = blockedPackages.isNotEmpty() || blockedWebsites.isNotEmpty()
         }
 
         fun normalizeDomain(raw: String): String {
