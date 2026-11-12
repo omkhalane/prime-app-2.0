@@ -739,8 +739,10 @@ fun OpalApp() {
                         onTogglePermanentProtection = { enabled ->
                             if (enabled && !uiState.hasVpnPermission) {
                                 onRequestVpnPermission()
+                            } else if (!enabled) {
+                                requestDeviceReauth { viewModel.togglePermanentWebsiteProtection(false) }
                             } else {
-                                viewModel.togglePermanentWebsiteProtection(enabled)
+                                viewModel.togglePermanentWebsiteProtection(true)
                             }
                         },
                         onToggleCategory = { catId, enabled ->
