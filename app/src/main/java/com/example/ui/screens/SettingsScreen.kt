@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,6 +80,8 @@ fun SettingsScreen(
 ) {
     val scrollState = rememberScrollState()
 
+    BackHandler(onBack = onBackClick)
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -149,9 +153,9 @@ fun SettingsScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xD914181F))
-                .border(1.dp, Color(0x3300E59A), RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(OpalCardBg)
+                .border(1.dp, OpalCardBorder, RoundedCornerShape(26.dp))
                 .padding(22.dp)
         ) {
             Column {
@@ -187,7 +191,7 @@ fun SettingsScreen(
                         containerColor = OpalMintLight,
                         contentColor = Color.Black
                     ),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
@@ -225,7 +229,7 @@ fun SettingsScreen(
                 title = "Autofocus",
                 subtitle = "Coming soon"
             )
-            HorizontalDivider(color = Color(0xFF23272C))
+            HorizontalDivider(color = OpalCardBorder)
             SettingsItemRow(
                 icon = Icons.Default.Shield,
                 title = "Block screens",
@@ -385,7 +389,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF1B1E22))
+                .background(OpalCardBg)
                 .border(1.dp, OpalCardBorder, RoundedCornerShape(20.dp))
                 .padding(16.dp)
         ) {
