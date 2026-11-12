@@ -13,6 +13,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -26,6 +28,7 @@ class BlockingAnalyticsRepository(
 
     // Bounded in-memory event queue for batched DB writes
     private val eventQueue = ConcurrentLinkedQueue<BlockedWebsiteEventEntity>()
+    private val flushMutex = Mutex()
     private var batchFlushJob: Job? = null
 
     init {
@@ -100,7 +103,9 @@ class BlockingAnalyticsRepository(
     fun getRecentEvents(limit: Int = 50): Flow<List<BlockedWebsiteEventEntity>> = eventDao.getRecentEvents(limit)
 
     suspend fun clearHistory() = withContext(Dispatchers.IO) {
-        eventQueue.clear()
-        eventDao.clearAllEvents()
+        flushMutex.withLock {
+            eventQueue.clear()
+            eventDao.clearAllEvents()
+        }
     }
 }
