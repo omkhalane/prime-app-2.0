@@ -317,7 +317,7 @@ fun WebsiteSelectionScreen(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = domainItem.category + when { domainItem.isPermanent -> " • Permanent"; domainItem.expiresAtMillis > 0L -> " • Time-limited"; else -> "" },
+                                    text = domainItem.category + when { domainItem.isPermanent -> " • Permanent"; domainItem.expiresAtMillis > 0L && domainItem.expiresAtMillis <= System.currentTimeMillis() -> " • Expired"; domainItem.expiresAtMillis > 0L -> " • Expires in ${((domainItem.expiresAtMillis - System.currentTimeMillis()) / 3_600_000L).coerceAtLeast(1L)}h"; else -> " • No expiry" },
                                     color = PrimeTextTertiary,
                                     fontSize = 11.sp
                                 )
