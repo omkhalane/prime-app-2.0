@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.vpn.db.BlockingScheduleDao
 import com.example.vpn.db.BlockingScheduleEntity
 import com.example.vpn.db.WebsiteBlockDatabase
+import com.example.vpn.dns.DomainMatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -38,6 +39,8 @@ class BlockingScheduleRepository(
         require(activeDays.isNotEmpty()) { "Select at least one active day" }
         require(activeDays.all { it in 0..6 })
         require(categories.isNotEmpty() || customDomains.isNotEmpty()) { "Select at least one blocking category or domain" }
+        require(categories.none { it.contains(',') }) { "Category names cannot contain commas" }
+        require(customDomains.all { DomainMatcher.isValidDomain(it) }) { "A scheduled domain is invalid" }
         require(startDateIso == null || isValidDate(startDateIso))
         require(endDateIso == null || isValidDate(endDateIso))
         require(startDateIso == null || endDateIso == null || startDateIso <= endDateIso)
