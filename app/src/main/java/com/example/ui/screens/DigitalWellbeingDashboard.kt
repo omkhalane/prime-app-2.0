@@ -129,7 +129,7 @@ fun DigitalWellbeingDashboard(
                     icon = Icons.Rounded.Refresh,
                     contentDescription = "Refresh",
                     onClick = onRetryFetch,
-                    containerSize = 40.dp,
+                    containerSize = 44.dp,
                     iconSize = 18.dp,
                     tint = PrimeTextSecondary
                 )
