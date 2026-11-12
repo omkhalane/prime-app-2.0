@@ -31,4 +31,23 @@ class AlarmSchedulerHelperTest {
         val alarm = AlarmItem(id = "once", hour = 9, minute = 0, recurrence = AlarmRecurrence.ONCE)
         assertNotNull(AlarmSchedulerHelper.calculateNextTriggerMillis(alarm, now))
     }
+    @Test fun weekdaysUseMondayThroughFridayIndexing() {
+        val now = Calendar.getInstance().apply {
+            set(2026, Calendar.NOVEMBER, 15, 8, 0, 0) // Sunday
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val alarm = AlarmItem(
+            id = "weekdays",
+            hour = 9,
+            minute = 0,
+            recurrence = AlarmRecurrence.WEEKDAYS,
+            selectedDays = setOf(1, 2, 3, 4, 5)
+        )
+        val next = Calendar.getInstance().apply {
+            timeInMillis = AlarmSchedulerHelper.calculateNextTriggerMillis(alarm, now)!!
+        }
+        assertEquals(Calendar.MONDAY, next.get(Calendar.DAY_OF_WEEK))
+        assertEquals(16, next.get(Calendar.DAY_OF_MONTH))
+    }
+
 }
