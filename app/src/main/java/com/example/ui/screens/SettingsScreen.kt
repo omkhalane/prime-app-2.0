@@ -314,7 +314,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "Block apps on your Mac too",
+                            text = "Coming soon",
                             color = OpalTextSecondary,
                             fontSize = 13.sp
                         )
@@ -372,7 +372,7 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.Restore,
                 title = "Restore purchase",
-                subtitle = null
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
