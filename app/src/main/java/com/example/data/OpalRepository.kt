@@ -35,7 +35,10 @@ import java.util.Locale
 import java.text.SimpleDateFormat
 import java.text.ParsePosition
 
-class OpalRepository(private val context: Context? = null) {
+class OpalRepository(
+    private val context: Context? = null,
+    private val loadAppsOnInit: Boolean = true
+) {
 
     companion object {
         /** Re-evaluate scheduled app shields without querying UsageStats or creating a repository. */
@@ -338,7 +341,7 @@ class OpalRepository(private val context: Context? = null) {
     val profileFlow: StateFlow<UserProfile> = _profileFlow.asStateFlow()
 
     init {
-        loadInitialAppsAndTrack()
+        if (loadAppsOnInit) loadInitialAppsAndTrack()
     }
 
     fun isRealOnboardingCompleted(): Boolean {
