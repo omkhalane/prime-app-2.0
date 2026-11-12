@@ -1454,12 +1454,12 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
                 BenefitItem(
                     icon = Icons.Default.Schedule,
                     title = "Protected focus sessions",
-                    desc = "Create focus windows and keep distracting apps out of reach."
+                    desc = "Create focus windows and block distractions when your shields are enabled."
                 )
                 BenefitItem(
                     icon = Icons.Default.CalendarToday,
-                    title = "48 days back this year",
-                    desc = "Develop your focus plan to save up to 48 days this year"
+                    title = "A plan that fits your day",
+                    desc = "Set realistic goals for screen time, focus and daily routines."
                 )
             }
         }
@@ -1474,7 +1474,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
 
             Button(
                 onClick = onComplete,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier
                     .fillMaxWidth()
