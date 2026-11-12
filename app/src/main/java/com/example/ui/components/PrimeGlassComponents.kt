@@ -353,7 +353,7 @@ fun PrimeGlassIconButton(
 
     Box(
         modifier = modifier
-            .size(containerSize)
+            .size(containerSize.coerceAtLeast(44.dp))
             .scale(scale)
             .clip(shape)
             .background(PrimeGlassCardBg)
