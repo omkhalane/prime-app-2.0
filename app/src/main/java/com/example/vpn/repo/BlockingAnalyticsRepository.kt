@@ -8,6 +8,7 @@ import com.example.vpn.db.DomainAttemptCount
 import com.example.vpn.db.WebsiteBlockDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,7 @@ class BlockingAnalyticsRepository(
     private val database: WebsiteBlockDatabase = WebsiteBlockDatabase.getInstance(context)
 ) {
     private val eventDao: BlockedEventDao = database.blockedEventDao()
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Bounded in-memory event queue for batched DB writes
     private val eventQueue = ConcurrentLinkedQueue<BlockedWebsiteEventEntity>()
@@ -56,6 +57,7 @@ class BlockingAnalyticsRepository(
             ruleId = ruleId,
             blockingReason = reason
         )
+        while (eventQueue.size >= 2000) eventQueue.poll()
         eventQueue.offer(event)
         if (eventQueue.size >= 10) {
             scope.launch { flushEventQueue() }
@@ -71,7 +73,9 @@ class BlockingAnalyticsRepository(
         if (batch.isNotEmpty()) {
             try {
                 eventDao.insertEvents(batch)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                batch.forEach(eventQueue::offer)
+            }
         }
     }
 
