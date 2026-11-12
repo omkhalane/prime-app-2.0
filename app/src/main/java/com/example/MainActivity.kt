@@ -733,6 +733,7 @@ fun OpalApp() {
                         activeRulesCount = uiState.activeWebsiteRulesCount,
                         blockedTodayCount = uiState.todayBlockedWebsitesCount,
                         categories = uiState.websiteCategories,
+                        domains = uiState.blockedDomainsList,
                         onBackClick = { viewModel.closeWebsiteBlockerDashboard() },
                         onRequestVpnPermission = onRequestVpnPermission,
                         onTogglePermanentProtection = { enabled ->
