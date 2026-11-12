@@ -1646,10 +1646,15 @@ class OpalViewModel(
         }
     }
 
-    fun toggleWebsitePermanent(domain: String, permanent: Boolean) {
+    fun toggleWebsitePermanent(domain: String, permanent: Boolean, reauthenticated: Boolean = false) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.toggleDomainPermanent(domain, permanent)
-            blockingManager?.reconcileActiveRules()
+            if (!permanent && !reauthenticated) {
+                _uiState.update { it.copy(snackbarMessage = "Verify your device to remove permanent protection") }
+                return@launch
+            }
+            val manager = blockingManager ?: return@launch
+            manager.blocklistRepo.toggleDomainPermanent(domain, permanent)
+            manager.reconcileActiveRules()
         }
     }
 
@@ -1684,15 +1689,20 @@ class OpalViewModel(
         }
     }
 
-    fun deleteCustomWebsiteDomain(domain: String) {
+    fun deleteCustomWebsiteDomain(domain: String, reauthenticated: Boolean = false) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.deleteDomain(domain)
+            val manager = blockingManager ?: return@launch
+            if (manager.blocklistRepo.isDomainPermanent(domain) && !reauthenticated) {
+                _uiState.update { it.copy(snackbarMessage = "Verify your device to remove permanent protection") }
+                return@launch
+            }
+            manager.blocklistRepo.deleteDomain(domain)
             val appWebsite = repository.appsFlow.value.firstOrNull {
                 it.isWebsite && com.example.vpn.dns.DomainMatcher.normalize(it.name) ==
                     com.example.vpn.dns.DomainMatcher.normalize(domain)
             }
             appWebsite?.let { repository.removeBlockedApp(it.id) }
-            blockingManager?.reconcileActiveRules()
+            manager.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Removed $domain") }
         }
     }
