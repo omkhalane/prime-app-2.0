@@ -82,8 +82,13 @@ class BlocklistRepository(
     }
 
     suspend fun toggleDomainPermanent(domain: String, isPermanent: Boolean) = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        domainDao.updateDomainPermanent(DomainMatcher.normalize(domain), isPermanent, now + 24L * 60L * 60L * 1000L)
+        val normalized = DomainMatcher.normalize(domain)
+        if (isPermanent) {
+            domainDao.markDomainPermanent(normalized)
+        } else {
+            val renewedUntil = System.currentTimeMillis() + 24L * 60L * 60L * 1000L
+            domainDao.clearDomainPermanent(normalized, renewedUntil)
+        }
     }
 
     suspend fun toggleCategoryEnabled(categoryName: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
@@ -132,7 +137,7 @@ class BlocklistRepository(
             val isCatActive = activeCategories.contains(domainEntity.category)
             val isSessionExplicit = sessionDomains.contains(domainEntity.domain)
             val isPermanent = domainEntity.isPermanent
-            val isNotExpired = domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
+            val isNotExpired = domainEntity.isPermanent || domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
 
             if (isNotExpired && (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive))) {
                 resultMap[domainEntity.domain] = domainEntity.category
