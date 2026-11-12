@@ -1662,7 +1662,7 @@ class OpalViewModel(
             }
             val added = manager.blocklistRepo.addCustomDomain(domain, categoryId, permanent, durationMillis)
             if (!added) {
-                _uiState.update { it.copy(snackbarMessage = "Enter a valid domain and a positive duration") }
+                _uiState.update { it.copy(snackbarMessage = "Domain is invalid, already exists, or duration is invalid") }
                 return@launch
             }
             manager.reconcileActiveRules()
