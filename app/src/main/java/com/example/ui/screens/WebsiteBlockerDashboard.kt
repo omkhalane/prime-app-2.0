@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.PrimeBackHeader
+import com.example.ui.components.PrimeMetricCard
+import com.example.ui.components.PrimeSectionHeader
 import com.example.ui.components.PrimeGlassIconButton
 import com.example.ui.components.PrimeStatusPill
 import com.example.ui.theme.*
@@ -124,7 +126,10 @@ fun WebsiteBlockerDashboard(
             }
         }
         Spacer(Modifier.height(22.dp))
-        Text("Categories", color = PrimeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        PrimeSectionHeader(
+            title = "Categories",
+            subtitle = "Choose which groups stay blocked."
+        )
         Spacer(Modifier.height(10.dp))
         displayCategories.forEach { (label, aliases) ->
             val category = categories.firstOrNull { it.name in aliases }
@@ -174,11 +179,12 @@ fun WebsiteBlockerDashboard(
 
 @Composable
 private fun Metric(label: String, value: String, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(14.dp)).background(Color(0xFF101010)).clickable(onClick = onClick).padding(13.dp)) {
-        Text(label, color = PrimeTextTertiary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(5.dp))
-        Text(value, color = PrimeTextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-    }
+    PrimeMetricCard(
+        label = label,
+        value = value,
+        modifier = modifier,
+        onClick = onClick
+    )
 }
 
 @Composable
