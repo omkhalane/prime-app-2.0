@@ -188,7 +188,7 @@ fun CustomBlocklistScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Switch(
-                                checked = domainItem.isEnabled,
+                                checked = domainItem.isEnabled && (domainItem.expiresAtMillis == 0L || domainItem.expiresAtMillis > System.currentTimeMillis()),
                                 onCheckedChange = { onToggleEnabled(domainItem.domain, it) },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.Black,
