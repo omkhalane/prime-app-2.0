@@ -516,7 +516,6 @@ fun OpalApp() {
                     val isSecure = DeviceSecurityHelper.isDeviceSecure(context)
                     SystemReauthDialog(
                         onDismiss = { viewModel.dismissReauthDialog() },
-                        onSuccess = { viewModel.onReauthSuccess() },
                         isSystemLockAvailable = isSecure,
                         onLaunchSystemPrompt = {
                             requestDeviceReauth { viewModel.onReauthSuccess() }
