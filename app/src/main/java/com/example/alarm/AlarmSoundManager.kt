@@ -17,6 +17,7 @@ import com.example.model.RingtoneOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -34,7 +35,7 @@ object AlarmSoundManager {
     @Volatile private var activeRingtoneId: String = "zen_crystal"
     @Volatile private var muted: Boolean = false
     @Volatile var isSessionSoundEnabled: Boolean = true
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val BUILT_IN_RINGTONES = listOf(
         RingtoneOption("zen_crystal", "Zen Crystal Chime", null, true),
@@ -203,22 +204,21 @@ object AlarmSoundManager {
     }
 
     fun stopPlayback(context: Context) {
+        fadeJob?.cancel()
+        fadeJob = null
+        syntheticToneJob?.cancel()
+        syntheticToneJob = null
+
+        val player = mediaPlayer
+        mediaPlayer = null
         try {
-            fadeJob?.cancel()
-            fadeJob = null
-            syntheticToneJob?.cancel()
-            syntheticToneJob = null
-
-            mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.release()
-            }
-            mediaPlayer = null
-
-            stopVibration(context)
-        } catch (_: Throwable) { }
+            if (player?.isPlaying == true) player.stop()
+        } catch (_: Throwable) {
+            // The player may already have entered an invalid state.
+        } finally {
+            try { player?.release() } catch (_: Throwable) { }
+        }
+        stopVibration(context)
     }
 
     private fun startVibration(context: Context) {
@@ -298,8 +298,9 @@ object AlarmSoundManager {
             }
         }
 
+        var audioTrack: AudioTrack? = null
         try {
-            val audioTrack = AudioTrack.Builder()
+            audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -317,12 +318,19 @@ object AlarmSoundManager {
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
 
-            audioTrack.write(audioData, 0, audioData.size)
-            audioTrack.play()
-            Thread.sleep((noteDuration * notes.size * 1000).toLong() + 200)
-            audioTrack.stop()
-            audioTrack.release()
-        } catch (_: Throwable) { }
+            val written = audioTrack.write(audioData, 0, audioData.size)
+            if (written > 0) {
+                audioTrack.play()
+                Thread.sleep((noteDuration * notes.size * 1000).toLong() + 200)
+            }
+        } catch (_: Throwable) {
+            // Audio hardware may be unavailable or interrupted.
+        } finally {
+            try {
+                if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) audioTrack.stop()
+            } catch (_: Throwable) { }
+            try { audioTrack?.release() } catch (_: Throwable) { }
+        }
     }
 
     /**
