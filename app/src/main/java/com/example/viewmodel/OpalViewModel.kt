@@ -1498,8 +1498,8 @@ class OpalViewModel(
         context?.let { ctx ->
             PermissionHelper.sendPrimeNudgeNotification(
                 ctx,
-                "Prime Focus Shield Activated",
-                "Prime is actively protecting your focus and tracking screen time."
+                "Your PRIME setup is ready",
+                "Enable VPN permission in Shields for website blocking and Usage Access for screen-time insights."
             )
         }
     }
