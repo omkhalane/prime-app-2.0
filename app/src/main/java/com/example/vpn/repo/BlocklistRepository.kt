@@ -52,7 +52,8 @@ class BlocklistRepository(
         durationMillis: Long = 24L * 60L * 60L * 1000L
     ): Boolean = withContext(Dispatchers.IO) {
         val norm = DomainMatcher.normalize(rawDomain)
-        if (norm.isEmpty() || !norm.contains('.')) return@withContext false
+        if (!DomainMatcher.isValidDomain(rawDomain)) return@withContext false
+        if (!isPermanent && durationMillis <= 0L) return@withContext false
 
         val entity = BlockedDomainEntity(
             domain = norm,
@@ -61,7 +62,7 @@ class BlocklistRepository(
             isEnabled = true,
             isFavorite = true,
             isPermanent = isPermanent,
-            expiresAtMillis = if (isPermanent || durationMillis <= 0L) 0L else System.currentTimeMillis() + durationMillis
+            expiresAtMillis = if (isPermanent) 0L else System.currentTimeMillis() + durationMillis.coerceAtMost(365L * 24L * 60L * 60L * 1000L)
         )
         domainDao.insertDomain(entity)
         true
@@ -81,7 +82,8 @@ class BlocklistRepository(
     }
 
     suspend fun toggleDomainPermanent(domain: String, isPermanent: Boolean) = withContext(Dispatchers.IO) {
-        domainDao.updateDomainPermanent(DomainMatcher.normalize(domain), isPermanent)
+        val now = System.currentTimeMillis()
+        domainDao.updateDomainPermanent(DomainMatcher.normalize(domain), isPermanent, now + 24L * 60L * 60L * 1000L)
     }
 
     suspend fun toggleCategoryEnabled(categoryName: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
