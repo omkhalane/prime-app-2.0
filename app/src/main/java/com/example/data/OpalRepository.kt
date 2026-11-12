@@ -44,7 +44,19 @@ class OpalRepository(private val context: Context? = null) {
                 .filterNot { it.startsWith("site_") }.toSet()
             val timer = prefs.getStringSet("timer_session_blocked_packages", emptySet()).orEmpty()
             val scheduled = activeRulePackages(prefs.getString("block_rules_json", null), System.currentTimeMillis())
-            OpalAccessibilityService.blockedPackages = manual + timer + scheduled
+            val packageTargets = scheduled.filterNot { it.startsWith("site_") }.toSet()
+            val customWebsiteEntries = prefs.getStringSet("custom_websites_set", emptySet()).orEmpty()
+            val savedWebsiteDomains = customWebsiteEntries.mapNotNull { entry ->
+                val parts = entry.split(":", limit = 2)
+                if (parts.size == 2 && parts[1].toBoolean()) parts[0] else null
+            }.toSet()
+            val websiteIdToDomain = customWebsiteEntries.mapNotNull { entry ->
+                val domain = entry.substringBefore(':').trim()
+                if (domain.isBlank()) null else ("site_" + domain.replace(".", "_")) to domain
+            }.toMap()
+            val scheduledWebsiteDomains = scheduled.mapNotNull { websiteIdToDomain[it] }.toSet()
+            OpalAccessibilityService.blockedPackages = manual + timer + packageTargets
+            OpalAccessibilityService.updateCustomBlockedWebsites(savedWebsiteDomains + scheduledWebsiteDomains)
             OpalAccessibilityService.isBlockingActive =
                 OpalAccessibilityService.blockedPackages.isNotEmpty() ||
                     OpalAccessibilityService.blockedWebsites.isNotEmpty()
