@@ -673,10 +673,7 @@ class OpalRepository(private val context: Context? = null) {
         val activeRulesCount = _rulesFlow.value.count { !it.isPaused }
         val effectiveBlockedPackages = blockedPackageNames + timerSessionBlockedPackages
         OpalAccessibilityService.blockedPackages = effectiveBlockedPackages
-        if (blockedWebsiteDomains.isNotEmpty()) {
-            val combinedWebsites = OpalAccessibilityService.blockedWebsites + blockedWebsiteDomains
-            OpalAccessibilityService.updateBlockedWebsites(combinedWebsites)
-        }
+        OpalAccessibilityService.updateCustomBlockedWebsites(blockedWebsiteDomains)
         OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
                 effectiveBlockedPackages.isNotEmpty() ||
                 OpalAccessibilityService.blockedWebsites.isNotEmpty()
