@@ -29,8 +29,75 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.text.ParsePosition
 
 class OpalRepository(private val context: Context? = null) {
+
+    companion object {
+        /** Re-evaluate scheduled app shields without querying UsageStats or creating a repository. */
+        fun syncTimeBasedRuleBlocking(context: Context) {
+            val prefs = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+            val manual = prefs.getStringSet("blocked_app_ids", emptySet()).orEmpty()
+                .filterNot { it.startsWith("site_") }.toSet()
+            val timer = prefs.getStringSet("timer_session_blocked_packages", emptySet()).orEmpty()
+            val scheduled = activeRulePackages(prefs.getString("block_rules_json", null), System.currentTimeMillis())
+            OpalAccessibilityService.blockedPackages = manual + timer + scheduled
+            OpalAccessibilityService.isBlockingActive =
+                OpalAccessibilityService.blockedPackages.isNotEmpty() ||
+                    OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        }
+
+        private fun activeRulePackages(json: String?, nowMillis: Long): Set<String> {
+            if (json.isNullOrBlank()) return emptySet()
+            val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
+            val minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val today = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 0=Monday ... 6=Sunday
+            val yesterday = (today + 6) % 7
+            val blocked = mutableSetOf<String>()
+            return try {
+                val rules = JSONArray(json)
+                for (i in 0 until rules.length()) {
+                    val rule = rules.getJSONObject(i)
+                    if (rule.optBoolean("is_paused", false)) continue
+                    val apps = rule.optJSONArray("blocked_apps") ?: continue
+                    if (apps.length() == 0) continue
+                    val dayArray = rule.optJSONArray("active_days")
+                    val days = if (dayArray == null || dayArray.length() == 0) setOf(0, 1, 2, 3, 4)
+                    else (0 until dayArray.length()).mapNotNull { dayArray.optInt(it, -1).takeIf { d -> d in 0..6 } }.toSet()
+                    if (days.isEmpty()) continue
+                    val start = parseRuleTime(rule.optString("from_time", "9:00 am")) ?: continue
+                    val end = parseRuleTime(rule.optString("to_time", "5:00 pm")) ?: continue
+                    val active = if (end > start) {
+                        today in days && minute in start until end
+                    } else {
+                        (today in days && minute >= start) || (minute < end && yesterday in days)
+                    }
+                    if (active) for (appIndex in 0 until apps.length()) {
+                        apps.optString(appIndex).takeIf { it.isNotBlank() }?.let(blocked::add)
+                    }
+                }
+                blocked
+            } catch (_: Exception) {
+                emptySet()
+            }
+        }
+
+        private fun parseRuleTime(value: String): Int? {
+            val input = value.trim().uppercase(Locale.US)
+            for (pattern in listOf("h:mm a", "hh:mm a", "H:mm")) {
+                val format = SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }
+                val position = ParsePosition(0)
+                val parsed = format.parse(input, position) ?: continue
+                if (position.index != input.length) continue
+                val calendar = Calendar.getInstance().apply { time = parsed }
+                return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+            }
+            return null
+        }
+    }
+
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -670,15 +737,12 @@ class OpalRepository(private val context: Context? = null) {
             .map { it.name }
             .toSet()
 
-        val activeRulesCount = _rulesFlow.value.count { !it.isPaused }
         val effectiveBlockedPackages = blockedPackageNames + timerSessionBlockedPackages
         OpalAccessibilityService.blockedPackages = effectiveBlockedPackages
         OpalAccessibilityService.updateCustomBlockedWebsites(blockedWebsiteDomains)
-        OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
-                effectiveBlockedPackages.isNotEmpty() ||
-                OpalAccessibilityService.blockedWebsites.isNotEmpty()
         context?.let { ctx ->
             try {
+                syncTimeBasedRuleBlocking(ctx)
                 com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
             } catch (_: Exception) { }
         }
