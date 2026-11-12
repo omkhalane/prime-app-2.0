@@ -264,7 +264,7 @@ object AlarmSoundManager {
     /**
      * Synthesize pleasing harmonic tones using PCM AudioTrack (pure Kotlin synthesis).
      */
-    private fun playSyntheticToneOnce(toneId: String) {
+    private suspend fun playSyntheticToneOnce(toneId: String) {
         val notes = when (toneId) {
             "morning_breeze" -> doubleArrayOf(392.0, 523.25, 659.25, 783.99, 1046.50) // G4, C5, E5, G5, C6
             "cosmic_sunrise" -> doubleArrayOf(440.0, 554.37, 659.25, 880.0, 1108.73) // A4, C#5, E5, A5, C#6
@@ -321,7 +321,7 @@ object AlarmSoundManager {
             val written = track.write(audioData, 0, audioData.size)
             if (written > 0) {
                 track.play()
-                Thread.sleep((noteDuration * notes.size * 1000).toLong() + 200)
+                delay((noteDuration * notes.size * 1000).toLong() + 200)
             }
         } catch (_: Throwable) {
             // Audio hardware may be unavailable or interrupted.
