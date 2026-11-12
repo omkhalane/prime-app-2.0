@@ -22,8 +22,8 @@ interface BlockedWebsiteDao {
     @Query("SELECT * FROM blocked_domains WHERE category = :category ORDER BY domain ASC")
     fun getDomainsByCategory(category: String): Flow<List<BlockedDomainEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDomain(domain: BlockedDomainEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertDomain(domain: BlockedDomainEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDomains(domains: List<BlockedDomainEntity>)
