@@ -341,7 +341,10 @@ class OpalRepository(
     val profileFlow: StateFlow<UserProfile> = _profileFlow.asStateFlow()
 
     init {
-        if (loadAppsOnInit) loadInitialAppsAndTrack()
+        if (loadAppsOnInit) {
+            if (context != null) scope.launch(Dispatchers.IO) { loadInitialAppsAndTrack() }
+            else loadInitialAppsAndTrack()
+        }
     }
 
     fun isRealOnboardingCompleted(): Boolean {
