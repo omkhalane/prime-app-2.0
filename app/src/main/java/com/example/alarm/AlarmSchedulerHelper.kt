@@ -49,18 +49,19 @@ object AlarmSchedulerHelper {
             AlarmRecurrence.CUSTOM -> alarm.selectedDays
         }
 
-        if (alarm.recurrence == AlarmRecurrence.ONCE || activeDays.isEmpty()) {
+        if (alarm.recurrence == AlarmRecurrence.ONCE) {
             val candidate = Calendar.getInstance().apply {
+                timeInMillis = nowMillis
                 set(Calendar.HOUR_OF_DAY, alarm.hour)
                 set(Calendar.MINUTE, alarm.minute)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            if (candidate.timeInMillis <= nowMillis) {
-                candidate.add(Calendar.DAY_OF_YEAR, 1)
-            }
+            if (candidate.timeInMillis <= nowMillis) candidate.add(Calendar.DAY_OF_YEAR, 1)
             return candidate.timeInMillis
         }
+        // A custom alarm with no valid selected days is disabled, not a daily alarm.
+        if (activeDays.none { it in 1..7 }) return null
 
         // For recurring, check next 7 days
         for (offset in 0..7) {
