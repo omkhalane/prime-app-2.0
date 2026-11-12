@@ -129,7 +129,7 @@ private fun NavItem(
         Text(
             text = label,
             color = if (selected) PrimeTextPrimary else PrimeTextTertiary,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             lineHeight = 13.sp,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             maxLines = 1
