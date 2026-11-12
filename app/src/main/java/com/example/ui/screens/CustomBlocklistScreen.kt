@@ -176,7 +176,7 @@ fun CustomBlocklistScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (domainItem.isPermanent) "Permanent 24/7 Block" else "Session Block",
+                                    text = if (domainItem.isPermanent) "Permanent 24/7 Block" else if (domainItem.expiresAtMillis > 0L && domainItem.expiresAtMillis <= System.currentTimeMillis()) "Expired" else if (domainItem.expiresAtMillis > 0L) "Expires in ${((domainItem.expiresAtMillis - System.currentTimeMillis()) / 3_600_000L).coerceAtLeast(1L)}h" else "No expiry",
                                     color = if (domainItem.isPermanent) Color(0xFF00E5FF) else PrimeTextTertiary,
                                     fontSize = 11.sp
                                 )
