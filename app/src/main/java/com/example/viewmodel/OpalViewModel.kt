@@ -1653,11 +1653,24 @@ class OpalViewModel(
         }
     }
 
-    fun addCustomWebsiteDomain(domain: String, categoryId: String = "Custom Websites", permanent: Boolean = false) {
+    fun addCustomWebsiteDomain(domain: String, categoryId: String = "Custom Websites", permanent: Boolean = false, durationMillis: Long = 24L * 60L * 60L * 1000L) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.addCustomDomain(domain, categoryId, permanent)
+            blockingManager?.blocklistRepo?.addCustomDomain(domain, categoryId, permanent, durationMillis)
             blockingManager?.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Added $domain to blocklist") }
+        }
+    }
+
+    fun addCustomWebsiteCategory(name: String, description: String) {
+        viewModelScope.launch {
+            runCatching {
+                blockingManager?.blocklistRepo?.addCustomCategory(name, description, 0xFF00E5A0)
+                blockingManager?.reconcileActiveRules()
+            }.onSuccess {
+                _uiState.update { it.copy(snackbarMessage = "Category created") }
+            }.onFailure { error ->
+                _uiState.update { it.copy(snackbarMessage = error.message ?: "Could not create category") }
+            }
         }
     }
 
@@ -1675,7 +1688,10 @@ class OpalViewModel(
         startMinute: Int,
         endHour: Int,
         endMinute: Int,
-        daysOfWeek: String
+        daysOfWeek: String,
+        categories: Set<String> = emptySet(),
+        startDateIso: String? = null,
+        endDateIso: String? = null
     ) {
         viewModelScope.launch {
             val days = daysOfWeek.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
@@ -1686,7 +1702,9 @@ class OpalViewModel(
                 endHour = endHour,
                 endMinute = endMinute,
                 activeDays = days,
-                categories = emptySet()
+                categories = categories,
+                startDateIso = startDateIso,
+                endDateIso = endDateIso
             )
             blockingManager?.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Schedule '$title' created") }
