@@ -219,8 +219,8 @@ class BlockingManager private constructor(private val context: Context) {
     fun stopWebsiteShieldManual() {
         togglePermanentProtection(false)
         isSessionActive = false
-        sessionBlockedDomains.clear()
-        sessionBlockedCategories.clear()
+        sessionBlockedDomains = emptySet()
+        sessionBlockedCategories = emptySet()
         prefs.edit().putBoolean("focus_session_active", false)
             .remove("focus_session_domains").remove("focus_session_categories").apply()
         PrimeVpnService.stopService(context)
