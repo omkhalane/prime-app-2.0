@@ -124,7 +124,7 @@ fun CustomBlocklistScreen(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Add domains to your personal blocklist. You can mark domains as Permanent to block them 24/7, or session-only for focus blocks.",
+                text = "Add domains to your personal blocklist. Choose a fixed blocking duration or protect a domain permanently.",
                 color = PrimeTextSecondary,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
