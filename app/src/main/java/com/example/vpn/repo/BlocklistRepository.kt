@@ -97,6 +97,7 @@ class BlocklistRepository(
 
     suspend fun addCustomCategory(name: String, description: String, colorHex: Long) = withContext(Dispatchers.IO) {
         require(name.isNotBlank())
+        require(!name.contains(',')) { "Category names cannot contain commas" }
         require(categoryDao.getCategoryByName(name.trim()) == null) { "A category with this name already exists" }
         val cat = CategoryEntity(
             name = name.trim(),
@@ -111,6 +112,7 @@ class BlocklistRepository(
     }
 
     suspend fun deleteCustomCategory(name: String) = withContext(Dispatchers.IO) {
+        categoryDao.moveDomainsToDefaultCategory(name)
         categoryDao.deleteCustomCategory(name)
     }
 
