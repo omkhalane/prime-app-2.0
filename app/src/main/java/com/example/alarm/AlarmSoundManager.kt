@@ -17,6 +17,7 @@ import com.example.model.RingtoneOption
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -25,7 +26,7 @@ import kotlin.math.sin
 
 object AlarmSoundManager {
 
-    private var mediaPlayer: MediaPlayer? = null
+    @Volatile private var mediaPlayer: MediaPlayer? = null
     private var syntheticToneJob: Job? = null
     private var vibratorJob: Job? = null
     private var vibrator: Vibrator? = null
@@ -34,7 +35,7 @@ object AlarmSoundManager {
     @Volatile private var activeRingtoneId: String = "zen_crystal"
     @Volatile private var muted: Boolean = false
     @Volatile var isSessionSoundEnabled: Boolean = true
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val BUILT_IN_RINGTONES = listOf(
         RingtoneOption("zen_crystal", "Zen Crystal Chime", null, true),
@@ -54,8 +55,7 @@ object AlarmSoundManager {
             val ringtoneManager = RingtoneManager(context).apply {
                 setType(RingtoneManager.TYPE_ALARM or RingtoneManager.TYPE_RINGTONE)
             }
-            val cursor: Cursor? = ringtoneManager.cursor
-            if (cursor != null) {
+            ringtoneManager.cursor?.use { cursor ->
                 while (cursor.moveToNext()) {
                     val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
                     val uri = ringtoneManager.getRingtoneUri(cursor.position)
@@ -96,20 +96,30 @@ object AlarmSoundManager {
 
         if (ringtoneUriString != null && ringtoneUriString.isNotBlank()) {
             try {
-                val uri = Uri.parse(ringtoneUriString)
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    setDataSource(context, uri)
-                    isLooping = true
-                    setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
-                    prepare()
-                    start()
+                val player = MediaPlayer()
+                mediaPlayer = player
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                player.setDataSource(context, Uri.parse(ringtoneUriString))
+                player.isLooping = true
+                player.setVolume(if (muted || fadeIn) 0f else outputGain, if (muted || fadeIn) 0f else outputGain)
+                player.setOnPreparedListener { prepared ->
+                    if (mediaPlayer === prepared && !muted) prepared.start()
                 }
+                player.setOnErrorListener { failed, _, _ ->
+                    if (mediaPlayer === failed) {
+                        mediaPlayer = null
+                        try { failed.release() } catch (_: Throwable) { }
+                        startSyntheticToneLoop(ringtoneId)
+                    }
+                    true
+                }
+                // Avoid blocking the BroadcastReceiver/UI thread while resolving ringtone URIs.
+                player.prepareAsync()
                 if (fadeIn) {
                     fadeJob?.cancel()
                     fadeJob = scope.launch {
@@ -151,32 +161,45 @@ object AlarmSoundManager {
 
         if (!option.isSynthetic && option.uriString != null) {
             try {
-                val uri = Uri.parse(option.uriString)
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    setDataSource(context, uri)
-                    isLooping = false
-                    setOnCompletionListener {
-                        stopPlayback(context)
+                val player = MediaPlayer()
+                mediaPlayer = player
+                player.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                player.setDataSource(context, Uri.parse(option.uriString))
+                player.isLooping = false
+                player.setOnPreparedListener { prepared ->
+                    if (mediaPlayer === prepared) prepared.start()
+                }
+                player.setOnCompletionListener { completed ->
+                    if (mediaPlayer === completed) {
+                        mediaPlayer = null
+                        completed.release()
                         onFinished?.invoke()
                     }
-                    prepare()
-                    start()
                 }
+                player.setOnErrorListener { failed, _, _ ->
+                    if (mediaPlayer === failed) {
+                        mediaPlayer = null
+                        try { failed.release() } catch (_: Throwable) { }
+                        onFinished?.invoke()
+                    }
+                    true
+                }
+                player.prepareAsync()
                 return
             } catch (_: Throwable) {
-                // Fallback
+                try { mediaPlayer?.release() } catch (_: Throwable) { }
+                mediaPlayer = null
+                // Fall back to the built-in preview.
             }
         }
 
         syntheticToneJob = scope.launch {
             playSyntheticToneOnce(option.id)
-            delay(4000L)
             onFinished?.invoke()
         }
     }
@@ -203,22 +226,21 @@ object AlarmSoundManager {
     }
 
     fun stopPlayback(context: Context) {
+        fadeJob?.cancel()
+        fadeJob = null
+        syntheticToneJob?.cancel()
+        syntheticToneJob = null
+
+        val player = mediaPlayer
+        mediaPlayer = null
         try {
-            fadeJob?.cancel()
-            fadeJob = null
-            syntheticToneJob?.cancel()
-            syntheticToneJob = null
-
-            mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.release()
-            }
-            mediaPlayer = null
-
-            stopVibration(context)
-        } catch (_: Throwable) { }
+            if (player?.isPlaying == true) player.stop()
+        } catch (_: Throwable) {
+            // The player may already have entered an invalid state.
+        } finally {
+            try { player?.release() } catch (_: Throwable) { }
+        }
+        stopVibration(context)
     }
 
     private fun startVibration(context: Context) {
@@ -265,7 +287,7 @@ object AlarmSoundManager {
     /**
      * Synthesize pleasing harmonic tones using PCM AudioTrack (pure Kotlin synthesis).
      */
-    private fun playSyntheticToneOnce(toneId: String) {
+    private suspend fun playSyntheticToneOnce(toneId: String) {
         val notes = when (toneId) {
             "morning_breeze" -> doubleArrayOf(392.0, 523.25, 659.25, 783.99, 1046.50) // G4, C5, E5, G5, C6
             "cosmic_sunrise" -> doubleArrayOf(440.0, 554.37, 659.25, 880.0, 1108.73) // A4, C#5, E5, A5, C#6
@@ -298,8 +320,9 @@ object AlarmSoundManager {
             }
         }
 
+        var audioTrack: AudioTrack? = null
         try {
-            val audioTrack = AudioTrack.Builder()
+            val track = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -316,13 +339,21 @@ object AlarmSoundManager {
                 .setBufferSizeInBytes(audioData.size * 2)
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
+            audioTrack = track
 
-            audioTrack.write(audioData, 0, audioData.size)
-            audioTrack.play()
-            Thread.sleep((noteDuration * notes.size * 1000).toLong() + 200)
-            audioTrack.stop()
-            audioTrack.release()
-        } catch (_: Throwable) { }
+            val written = track.write(audioData, 0, audioData.size)
+            if (written > 0) {
+                track.play()
+                delay((noteDuration * notes.size * 1000).toLong() + 200)
+            }
+        } catch (_: Throwable) {
+            // Audio hardware may be unavailable or interrupted.
+        } finally {
+            try {
+                if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) audioTrack.stop()
+            } catch (_: Throwable) { }
+            try { audioTrack?.release() } catch (_: Throwable) { }
+        }
     }
 
     /**

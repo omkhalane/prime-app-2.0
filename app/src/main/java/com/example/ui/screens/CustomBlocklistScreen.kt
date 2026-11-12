@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.PrimeBackHeader
 import com.example.ui.components.PrimeGlassIconButton
 import com.example.ui.theme.PrimeAccent
 import com.example.ui.theme.PrimeBackground
@@ -82,37 +83,22 @@ fun CustomBlocklistScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PrimeGlassIconButton(
-                icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                onClick = onBackClick,
-                containerSize = 40.dp,
-                iconSize = 20.dp
-            )
+        PrimeBackHeader(
+            title = "Custom domains",
+            subtitle = "Manage the websites you choose to block.",
+            onBackClick = onBackClick,
+            trailing = {
+                PrimeGlassIconButton(
+                    icon = Icons.Rounded.Add,
+                    contentDescription = "Add Domain",
+                    onClick = { isAddDialogOpen = true },
+                    containerSize = 44.dp,
+                    iconSize = 20.dp
+                )
+            }
+        )
 
-            Text(
-                text = "Custom Web Domains",
-                color = PrimeTextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            PrimeGlassIconButton(
-                icon = Icons.Rounded.Add,
-                contentDescription = "Add Domain",
-                onClick = { isAddDialogOpen = true },
-                containerSize = 40.dp,
-                iconSize = 20.dp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         // Description Card
         Box(

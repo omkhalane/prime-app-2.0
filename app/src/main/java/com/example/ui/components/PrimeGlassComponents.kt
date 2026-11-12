@@ -338,7 +338,7 @@ fun PrimeGlassIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = PrimeTextPrimary,
-    containerSize: Dp = 44.dp,
+    containerSize: Dp = 48.dp,
     iconSize: Dp = 20.dp,
     shape: Shape = CircleShape,
     testTag: String? = null
@@ -353,7 +353,7 @@ fun PrimeGlassIconButton(
 
     Box(
         modifier = modifier
-            .size(containerSize)
+            .size(containerSize.coerceAtLeast(48.dp))
             .scale(scale)
             .clip(shape)
             .background(PrimeGlassCardBg)

@@ -51,7 +51,7 @@ import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeWarning
 
 /**
- * Apple-inspired Liquid Glass Top Bar for PRIME.
+ * Minimal PRIME brand header with a quiet streak indicator and profile action.
  * Clean brand signature, glowing streak badge, and glass profile avatar.
  */
 @Composable
@@ -101,9 +101,9 @@ fun OpalTopBar(
                 Text(
                     text = "BECOME YOUR PRIME",
                     color = PrimeAccent,
-                    fontSize = 9.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.4.sp
+                    letterSpacing = 1.0.sp
                 )
             }
         }
@@ -141,11 +141,11 @@ fun OpalTopBar(
             // Apple-style Glass Profile Avatar Button
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(48.dp)
                     .scale(profileScale)
                     .clip(CircleShape)
                     .background(PrimeGlassCardBg)
-                    .border(BorderStroke(1.2.dp, PrimeAccent.copy(alpha = 0.6f)), CircleShape)
+                    .border(BorderStroke(1.dp, PrimeGlassBorder), CircleShape)
                     .clickable(
                         interactionSource = profileInteraction,
                         indication = null,
@@ -158,7 +158,7 @@ fun OpalTopBar(
                 Icon(
                     imageVector = Icons.Rounded.Person,
                     contentDescription = "Profile and Settings",
-                    tint = PrimeAccent,
+                    tint = PrimeTextPrimary,
                     modifier = Modifier.size(20.dp)
                 )
             }

@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -299,14 +300,27 @@ fun OpalApp() {
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = OpalBlack,
             bottomBar = {
-                if (!uiState.isSettingsOpen &&
+                if (!uiState.isOnboarding &&
+                    !uiState.isSettingsOpen &&
                     !uiState.isAchievementDashboardOpen &&
                     !uiState.isWebsiteBlockerDashboardOpen &&
                     !uiState.isWebsiteSelectionScreenOpen &&
                     !uiState.isCustomBlocklistScreenOpen &&
                     !uiState.isBlockingScheduleScreenOpen &&
                     !uiState.isBlockingAnalyticsScreenOpen &&
+                    !uiState.isCreatingRule &&
                     uiState.editingRule == null &&
+                    uiState.viewingRuleDetail == null &&
+                    !uiState.isTargetSettingsOpen &&
+                    !uiState.isScoreFormulaOpen &&
+                    uiState.selectedBadgeForDetail == null &&
+                    !uiState.isReauthDialogOpen &&
+                    uiState.activeCategorySheet == null &&
+                    !uiState.isTimerBlockAppsSheetOpen &&
+                    !uiState.isSelectAppsSheetOpen &&
+                    uiState.selectedTimerPreset == null &&
+                    !uiState.isRingtonePickerOpen &&
+                    !uiState.isPomodoroSettingsOpen &&
                     !uiState.isDigitalWellbeingOpen &&
                     !uiState.isDailyDashboardOpen &&
                     !uiState.isWeeklyReportOpen &&
@@ -326,6 +340,7 @@ fun OpalApp() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(bottom = innerPadding.calculateBottomPadding())
                     .background(OpalBlack)
             ) {
                 // Tab Content
@@ -333,7 +348,7 @@ fun OpalApp() {
                     NavigationTab.HOME -> {
                         HomeScreen(
                             uiState = uiState,
-                            onProfileClick = { viewModel.openSettings() },
+                            onProfileClick = { viewModel.selectTab(NavigationTab.PROFILE) },
                             onNavigateToMyApps = { viewModel.selectTab(NavigationTab.MY_APPS) },
                             onOpenDigitalWellbeing = { viewModel.openDigitalWellbeing() },
                             onRequestUsagePermission = {
@@ -378,6 +393,33 @@ fun OpalApp() {
                             onOpenPomodoro = { viewModel.openTimerTool(TimerToolSubscreen.POMODORO) },
                             onOpenStopwatch = { viewModel.openTimerTool(TimerToolSubscreen.STOPWATCH) },
                             onOpenAlarm = { viewModel.openTimerTool(TimerToolSubscreen.ALARM) }
+                        )
+                    }
+                    NavigationTab.INSIGHTS -> {
+                        DigitalWellbeingDashboard(
+                            totalScreenTime = uiState.profile.screenTimeToday,
+                            totalScreenTimeMillis = uiState.profile.screenTimeMillis,
+                            categories = uiState.todayCategoryUsage,
+                            topApps = uiState.todayAppUsage,
+                            hasUsagePermission = uiState.screenTimePermissionGranted,
+                            errorMessage = uiState.wellbeingError,
+                            onBackClick = { viewModel.selectTab(NavigationTab.HOME) },
+                            onRequestPermission = { PermissionHelper.requestUsageAccessPermission(context) },
+                            onRetryFetch = { viewModel.refreshWellbeingData() },
+                            onOpenDailyDashboard = { viewModel.openDailyDashboard() },
+                            onOpenWeeklyReport = { viewModel.openWeeklyReport() },
+                            onAppClick = { viewModel.openAppSpecificReport(it) },
+                            showBackButton = false
+                        )
+                    }
+                    NavigationTab.PROFILE -> {
+                        SettingsScreen(
+                            profile = uiState.profile,
+                            onBackClick = { viewModel.selectTab(NavigationTab.HOME) },
+                            onTryProClick = { viewModel.upgradeToPro() },
+                            onUseEmergencyPass = { viewModel.useEmergencyPass() },
+                            onReplayOnboarding = { viewModel.startOnboarding() },
+                            showBackButton = false
                         )
                     }
                 }
@@ -767,7 +809,7 @@ fun OpalApp() {
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true && !enabled) {
                                 requestDeviceReauth {
-                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsitePermanent(domain, false, reauthenticated = true)
                                     viewModel.toggleWebsiteDomain(domain, false)
                                 }
                             } else {
@@ -801,7 +843,7 @@ fun OpalApp() {
                         onDeleteDomain = { domain ->
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true) {
-                                requestDeviceReauth { viewModel.deleteCustomWebsiteDomain(domain) }
+                                requestDeviceReauth { viewModel.deleteCustomWebsiteDomain(domain, reauthenticated = true) }
                             } else {
                                 viewModel.deleteCustomWebsiteDomain(domain)
                             }
@@ -809,7 +851,7 @@ fun OpalApp() {
                         onTogglePermanent = { domain, isPermanent ->
                             if (!isPermanent) {
                                 requestDeviceReauth {
-                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsitePermanent(domain, false, reauthenticated = true)
                                     viewModel.toggleWebsiteDomain(domain, false)
                                 }
                             } else {
@@ -820,7 +862,7 @@ fun OpalApp() {
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true && !isBlocked) {
                                 requestDeviceReauth {
-                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsitePermanent(domain, false, reauthenticated = true)
                                     viewModel.toggleWebsiteDomain(domain, false)
                                 }
                             } else {

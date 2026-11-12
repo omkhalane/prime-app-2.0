@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.GlassCard
+import com.example.ui.components.PrimeBackHeader
 import com.example.ui.components.PrimeGlassIconButton
 import com.example.ui.theme.PrimeAccent
 import com.example.ui.theme.PrimeBackground
@@ -83,36 +84,21 @@ fun BlockingAnalyticsScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Top Bar
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PrimeGlassIconButton(
-                icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                onClick = onBackClick,
-                containerSize = 40.dp,
-                iconSize = 20.dp
-            )
-
-            Text(
-                text = "Blocking Analytics",
-                color = PrimeTextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            PrimeGlassIconButton(
-                icon = Icons.Rounded.DeleteOutline,
-                contentDescription = "Clear History",
-                onClick = onClearHistory,
-                containerSize = 40.dp,
-                iconSize = 20.dp,
-                tint = PrimeError.copy(alpha = 0.8f)
-            )
-        }
+        PrimeBackHeader(
+            title = "Blocking analytics",
+            subtitle = "Your progress, measured over time.",
+            onBackClick = onBackClick,
+            trailing = {
+                PrimeGlassIconButton(
+                    icon = Icons.Rounded.DeleteOutline,
+                    contentDescription = "Clear History",
+                    onClick = onClearHistory,
+                    containerSize = 44.dp,
+                    iconSize = 20.dp,
+                    tint = PrimeError.copy(alpha = 0.9f)
+                )
+            }
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 

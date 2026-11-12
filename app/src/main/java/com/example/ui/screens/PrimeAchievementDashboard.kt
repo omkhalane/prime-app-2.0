@@ -529,7 +529,7 @@ fun PrimeAchievementDashboard(
                                             Text(
                                                 text = "${badge.currentProgress.toInt()}/${badge.targetRequirement.toInt()} ${badge.unit}",
                                                 color = OpalTextSecondary,
-                                                fontSize = 9.sp
+                                                fontSize = 10.sp
                                             )
                                         }
                                     }

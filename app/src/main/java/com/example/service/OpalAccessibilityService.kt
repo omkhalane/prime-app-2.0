@@ -36,6 +36,8 @@ class OpalAccessibilityService : AccessibilityService() {
             private set
 
         private val websiteCategoryMap = ConcurrentHashMap<String, String>()
+        @Volatile private var managedBlockedWebsites: Set<String> = emptySet()
+        @Volatile private var customBlockedWebsites: Set<String> = emptySet()
 
         private val snoozedPackagesUntilMap = ConcurrentHashMap<String, Long>()
         private val snoozedWebsitesUntilMap = ConcurrentHashMap<String, Long>()
@@ -82,14 +84,21 @@ class OpalAccessibilityService : AccessibilityService() {
         }
 
         fun updateBlockedWebsites(domains: Collection<String>, categories: Map<String, String> = emptyMap()) {
-            val normalized = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
-            blockedWebsites = normalized
+            managedBlockedWebsites = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
+            blockedWebsites = managedBlockedWebsites + customBlockedWebsites
             websiteCategoryMap.clear()
             categories.forEach { (d, cat) ->
                 websiteCategoryMap[normalizeDomain(d)] = cat
             }
             isBlockingActive = blockedPackages.isNotEmpty() || blockedWebsites.isNotEmpty()
             safeLog(Log.DEBUG, TAG, "Updated blocked websites count: ${blockedWebsites.size}")
+        }
+
+        /** Replaces only app-level custom websites without erasing VPN/category rules. */
+        fun updateCustomBlockedWebsites(domains: Collection<String>) {
+            customBlockedWebsites = domains.map { normalizeDomain(it) }.filter { it.isNotBlank() }.toSet()
+            blockedWebsites = managedBlockedWebsites + customBlockedWebsites
+            isBlockingActive = blockedPackages.isNotEmpty() || blockedWebsites.isNotEmpty()
         }
 
         fun normalizeDomain(raw: String): String {
@@ -210,7 +219,11 @@ class OpalAccessibilityService : AccessibilityService() {
      */
     private fun checkAndInterceptBrowserWebsite(event: AccessibilityEvent, browserPackage: String) {
         val rootNode = rootInActiveWindow ?: event.source ?: return
-        val rawUrlText = extractUrlFromNodeHierarchy(rootNode) ?: return
+        val rawUrlText = try {
+            extractUrlFromNodeHierarchy(rootNode)
+        } finally {
+            rootNode.recycle()
+        } ?: return
 
         val matchedDomain = matchBlockedDomain(rawUrlText) ?: return
 
@@ -258,20 +271,25 @@ class OpalAccessibilityService : AccessibilityService() {
             try {
                 val nodes = root.findAccessibilityNodeInfosByViewId(viewId)
                 for (node in nodes) {
-                    val text = node.text?.toString()?.trim()
-                    if (!text.isNullOrEmpty() && (text.contains('.') || text.startsWith("http"))) {
-                        return text
+                    try {
+                        val text = node.text?.toString()?.trim()
+                        if (!text.isNullOrEmpty() && (text.contains('.') || text.startsWith("http"))) {
+                            return text
+                        }
+                    } finally {
+                        node.recycle()
                     }
                 }
             } catch (_: Exception) {}
         }
 
         // Fast path 2: Shallow traversal of window nodes (max 40 nodes)
-        return findUrlByTraversal(root, 0, 40)
+        return findUrlByTraversal(root, 0, intArrayOf(40))
     }
 
-    private fun findUrlByTraversal(node: AccessibilityNodeInfo?, currentDepth: Int, maxNodes: Int): String? {
-        if (node == null || currentDepth > 5) return null
+    private fun findUrlByTraversal(node: AccessibilityNodeInfo?, currentDepth: Int, remainingNodes: IntArray): String? {
+        if (node == null || currentDepth > 5 || remainingNodes[0] <= 0) return null
+        remainingNodes[0]--
 
         val viewId = node.viewIdResourceName?.lowercase(Locale.ROOT) ?: ""
         val text = node.text?.toString()?.trim()
@@ -291,7 +309,11 @@ class OpalAccessibilityService : AccessibilityService() {
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            val found = findUrlByTraversal(child, currentDepth + 1, maxNodes)
+            val found = try {
+                findUrlByTraversal(child, currentDepth + 1, remainingNodes)
+            } finally {
+                child.recycle()
+            }
             if (found != null) return found
         }
 
@@ -304,35 +326,13 @@ class OpalAccessibilityService : AccessibilityService() {
      * and query string direct domain visits.
      */
     private fun matchBlockedDomain(rawText: String): String? {
-        val cleanHost = normalizeDomain(rawText)
-
-        // 1. Direct host match or subdomain match
-        for (rule in blockedWebsites) {
-            if (cleanHost == rule || cleanHost.endsWith(".$rule")) {
-                return rule
-            }
+        // Only treat an actual hostname/URL as a visit. A search query such as
+        // "how does instagram.com work" must not trigger a false-positive block.
+        if (!com.example.vpn.dns.DomainMatcher.isValidDomain(rawText)) return null
+        val cleanHost = com.example.vpn.dns.DomainMatcher.normalize(rawText)
+        return blockedWebsites.firstOrNull { rule ->
+            com.example.vpn.dns.DomainMatcher.matchesRule(cleanHost, rule)
         }
-
-        // 2. Direct containment check if the user typed "instagram.com/reels" or "youtube.com" in search
-        val lowerText = rawText.lowercase(Locale.ROOT)
-        for (rule in blockedWebsites) {
-            if (lowerText.contains(rule)) {
-                // Ensure word boundary or delimiter around domain to avoid false positives
-                val index = lowerText.indexOf(rule)
-                val beforeChar = if (index > 0) lowerText[index - 1] else '/'
-                val afterIndex = index + rule.length
-                val afterChar = if (afterIndex < lowerText.length) lowerText[afterIndex] else '/'
-
-                val isBoundaryBefore = beforeChar in listOf('/', '.', '@', ' ', ':', '=')
-                val isBoundaryAfter = afterChar in listOf('/', '?', '#', ':', ' ', '&')
-
-                if (isBoundaryBefore && isBoundaryAfter) {
-                    return rule
-                }
-            }
-        }
-
-        return null
     }
 
     /**

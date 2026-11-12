@@ -1646,17 +1646,31 @@ class OpalViewModel(
         }
     }
 
-    fun toggleWebsitePermanent(domain: String, permanent: Boolean) {
+    fun toggleWebsitePermanent(domain: String, permanent: Boolean, reauthenticated: Boolean = false) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.toggleDomainPermanent(domain, permanent)
-            blockingManager?.reconcileActiveRules()
+            if (!permanent && !reauthenticated) {
+                _uiState.update { it.copy(snackbarMessage = "Verify your device to remove permanent protection") }
+                return@launch
+            }
+            val manager = blockingManager ?: return@launch
+            manager.blocklistRepo.toggleDomainPermanent(domain, permanent)
+            manager.reconcileActiveRules()
         }
     }
 
     fun addCustomWebsiteDomain(domain: String, categoryId: String = "Custom Websites", permanent: Boolean = false, durationMillis: Long = 24L * 60L * 60L * 1000L) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.addCustomDomain(domain, categoryId, permanent, durationMillis)
-            blockingManager?.reconcileActiveRules()
+            val manager = blockingManager
+            if (manager == null) {
+                _uiState.update { it.copy(snackbarMessage = "Website protection is unavailable") }
+                return@launch
+            }
+            val added = manager.blocklistRepo.addCustomDomain(domain, categoryId, permanent, durationMillis)
+            if (!added) {
+                _uiState.update { it.copy(snackbarMessage = "Domain is invalid, already exists, or duration is invalid") }
+                return@launch
+            }
+            manager.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Added $domain to blocklist") }
         }
     }
@@ -1664,8 +1678,9 @@ class OpalViewModel(
     fun addCustomWebsiteCategory(name: String, description: String) {
         viewModelScope.launch {
             runCatching {
-                blockingManager?.blocklistRepo?.addCustomCategory(name, description, 0xFF00E5A0)
-                blockingManager?.reconcileActiveRules()
+                val manager = blockingManager ?: error("Website protection is unavailable")
+                manager.blocklistRepo.addCustomCategory(name, description, 0xFF00E5A0)
+                manager.reconcileActiveRules()
             }.onSuccess {
                 _uiState.update { it.copy(snackbarMessage = "Category created") }
             }.onFailure { error ->
@@ -1674,10 +1689,20 @@ class OpalViewModel(
         }
     }
 
-    fun deleteCustomWebsiteDomain(domain: String) {
+    fun deleteCustomWebsiteDomain(domain: String, reauthenticated: Boolean = false) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.deleteDomain(domain)
-            blockingManager?.reconcileActiveRules()
+            val manager = blockingManager ?: return@launch
+            if (manager.blocklistRepo.isDomainPermanent(domain) && !reauthenticated) {
+                _uiState.update { it.copy(snackbarMessage = "Verify your device to remove permanent protection") }
+                return@launch
+            }
+            manager.blocklistRepo.deleteDomain(domain)
+            val appWebsite = repository.appsFlow.value.firstOrNull {
+                it.isWebsite && com.example.vpn.dns.DomainMatcher.normalize(it.name) ==
+                    com.example.vpn.dns.DomainMatcher.normalize(domain)
+            }
+            appWebsite?.let { repository.removeBlockedApp(it.id) }
+            manager.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Removed $domain") }
         }
     }
@@ -1696,7 +1721,8 @@ class OpalViewModel(
         viewModelScope.launch {
             val days = daysOfWeek.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
             runCatching {
-                blockingManager?.scheduleRepo?.addSchedule(
+                val manager = blockingManager ?: error("Website protection is unavailable")
+                manager.scheduleRepo.addSchedule(
                     title = title,
                     startHour = startHour,
                     startMinute = startMinute,
@@ -1707,7 +1733,7 @@ class OpalViewModel(
                     startDateIso = startDateIso,
                     endDateIso = endDateIso
                 )
-                blockingManager?.reconcileActiveRules()
+                manager.reconcileActiveRules()
             }.onSuccess {
                 _uiState.update { it.copy(snackbarMessage = "Schedule '$title' created") }
             }.onFailure { error ->

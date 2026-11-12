@@ -2,8 +2,10 @@ package com.example.model
 
 enum class NavigationTab(val title: String) {
     HOME("Home"),
+    TIMER("Focus"),
     MY_APPS("Shields"),
-    TIMER("Timer")
+    INSIGHTS("Insights"),
+    PROFILE("You")
 }
 
 data class BlockedAppItem(

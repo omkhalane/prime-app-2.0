@@ -77,6 +77,7 @@ fun DigitalWellbeingDashboard(
     onOpenDailyDashboard: () -> Unit,
     onOpenWeeklyReport: () -> Unit,
     onAppClick: (String) -> Unit,
+    showBackButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -108,13 +109,17 @@ fun DigitalWellbeingDashboard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PrimeGlassIconButton(
-                icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                onClick = onBackClick,
-                containerSize = 40.dp,
-                iconSize = 20.dp
-            )
+            if (showBackButton) {
+                PrimeGlassIconButton(
+                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    onClick = onBackClick,
+                    containerSize = 44.dp,
+                    iconSize = 20.dp
+                )
+            } else {
+                Spacer(modifier = Modifier.width(1.dp))
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -124,7 +129,7 @@ fun DigitalWellbeingDashboard(
                     icon = Icons.Rounded.Refresh,
                     contentDescription = "Refresh",
                     onClick = onRetryFetch,
-                    containerSize = 40.dp,
+                    containerSize = 44.dp,
                     iconSize = 18.dp,
                     tint = PrimeTextSecondary
                 )

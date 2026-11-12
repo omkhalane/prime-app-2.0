@@ -22,6 +22,7 @@ import com.example.service.OpalAccessibilityService
 import com.example.util.FaviconManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,13 +30,119 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
+import java.util.Locale
+import java.text.SimpleDateFormat
+import java.text.ParsePosition
 
-class OpalRepository(private val context: Context? = null) {
+class OpalRepository(
+    private val context: Context? = null,
+    private val loadAppsOnInit: Boolean = true
+) {
+
+    companion object {
+        /** Re-evaluate scheduled app shields without querying UsageStats or creating a repository. */
+        fun syncTimeBasedRuleBlocking(context: Context) {
+            val prefs = context.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
+            val manual = prefs.getStringSet("blocked_app_ids", emptySet()).orEmpty()
+                .filterNot { it.startsWith("site_") }.toSet()
+            val timer = prefs.getStringSet("timer_session_blocked_packages", emptySet()).orEmpty()
+            val scheduled = activeRulePackagesFromJson(prefs.getString("block_rules_json", null), System.currentTimeMillis())
+            val packageTargets = scheduled.filterNot { it.startsWith("site_") }.toSet()
+            val customWebsiteEntries = prefs.getStringSet("custom_websites_set", emptySet()).orEmpty()
+            val savedWebsiteDomains = customWebsiteEntries.mapNotNull { entry ->
+                val parts = entry.split(":", limit = 2)
+                if (parts.size == 2 && parts[1].toBoolean()) parts[0] else null
+            }.toSet()
+            val websiteIdToDomain = customWebsiteEntries.mapNotNull { entry ->
+                val domain = entry.substringBefore(':').trim()
+                if (domain.isBlank()) null else ("site_" + domain.replace(".", "_")) to domain
+            }.toMap()
+            val scheduledWebsiteDomains = scheduled.mapNotNull { websiteIdToDomain[it] }.toSet()
+            OpalAccessibilityService.blockedPackages = manual + timer + packageTargets
+            OpalAccessibilityService.updateCustomBlockedWebsites(savedWebsiteDomains + scheduledWebsiteDomains)
+            OpalAccessibilityService.isBlockingActive =
+                OpalAccessibilityService.blockedPackages.isNotEmpty() ||
+                    OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        }
+
+        private fun activeRulePackagesFromJson(json: String?, nowMillis: Long): Set<String> {
+            if (json.isNullOrBlank()) return emptySet()
+            return try {
+                val jsonRules = JSONArray(json)
+                val rules = (0 until jsonRules.length()).mapNotNull { index ->
+                    val obj = jsonRules.optJSONObject(index) ?: return@mapNotNull null
+                    val daysArray = obj.optJSONArray("active_days")
+                    val days = if (daysArray == null) setOf(0, 1, 2, 3, 4)
+                    else (0 until daysArray.length()).mapNotNull {
+                        daysArray.optInt(it, -1).takeIf { day -> day in 0..6 }
+                    }.toSet()
+                    val appsArray = obj.optJSONArray("blocked_apps")
+                    val apps = if (appsArray == null) emptyList() else
+                        (0 until appsArray.length()).map { appsArray.optString(it) }.filter { it.isNotBlank() }
+                    BlockRule(
+                        id = obj.optString("id", "saved_rule_$index"),
+                        title = obj.optString("title", "Shield"),
+                        startsInText = obj.optString("starts_in", "Active"),
+                        fromTime = obj.optString("from_time", "9:00 am"),
+                        toTime = obj.optString("to_time", "5:00 pm"),
+                        daysLabel = obj.optString("days_label", "Weekdays"),
+                        activeDays = days,
+                        blockedAppIds = apps,
+                        isHardMode = obj.optBoolean("is_hard_mode", false),
+                        allowBreaks = obj.optBoolean("allow_breaks", true),
+                        isPaused = obj.optBoolean("is_paused", false),
+                        isCustom = obj.optBoolean("is_custom", false)
+                    )
+                }
+                activeRulePackages(rules, nowMillis)
+            } catch (_: Exception) {
+                emptySet()
+            }
+        }
+
+        /** Pure evaluator: safe to unit-test without Android framework JSON or services. */
+        internal fun activeRulePackages(rules: List<BlockRule>, nowMillis: Long): Set<String> {
+            val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
+            val minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val today = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 0=Monday ... 6=Sunday
+            val yesterday = (today + 6) % 7
+            val blocked = mutableSetOf<String>()
+            for (rule in rules) {
+                if (rule.isPaused || rule.blockedAppIds.isEmpty()) continue
+                val days = rule.activeDays.filter { it in 0..6 }.toSet()
+                if (days.isEmpty()) continue
+                val start = parseRuleTime(rule.fromTime) ?: continue
+                val end = parseRuleTime(rule.toTime) ?: continue
+                val active = if (end > start) {
+                    today in days && minute in start until end
+                } else {
+                    (today in days && minute >= start) || (minute < end && yesterday in days)
+                }
+                if (active) blocked.addAll(rule.blockedAppIds.filter { it.isNotBlank() })
+            }
+            return blocked
+        }
+
+        private fun parseRuleTime(value: String): Int? {
+            val input = value.trim().uppercase(Locale.US)
+            for (pattern in listOf("h:mm a", "hh:mm a", "H:mm")) {
+                val format = SimpleDateFormat(pattern, Locale.US).apply { isLenient = false }
+                val position = ParsePosition(0)
+                val parsed = format.parse(input, position) ?: continue
+                if (position.index != input.length) continue
+                val calendar = Calendar.getInstance().apply { time = parsed }
+                return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+            }
+            return null
+        }
+    }
+
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Temporary timer-session targets must survive normal dashboard refreshes.
-    private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
+    @Volatile private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
 
     // Initial default rules (can be edited/saved by user)
     private val defaultRules = listOf(
@@ -227,13 +334,17 @@ class OpalRepository(private val context: Context? = null) {
     private val _profileFlow = MutableStateFlow(
         UserProfile(
             name = prefs?.getString("user_name", "omk") ?: "omk",
-            isPro = prefs?.getBoolean("is_pro", false) ?: false
+            isPro = prefs?.getBoolean("is_pro", false) ?: false,
+            emergencyPassesRemaining = (prefs?.getInt("emergency_passes_remaining", 1) ?: 1).coerceIn(0, 1)
         )
     )
     val profileFlow: StateFlow<UserProfile> = _profileFlow.asStateFlow()
 
     init {
-        loadInitialAppsAndTrack()
+        if (loadAppsOnInit) {
+            if (context != null) scope.launch(Dispatchers.IO) { loadInitialAppsAndTrack() }
+            else loadInitialAppsAndTrack()
+        }
     }
 
     fun isRealOnboardingCompleted(): Boolean {
@@ -322,7 +433,7 @@ class OpalRepository(private val context: Context? = null) {
                         fromTime = obj.optString("from_time", "9:00 am"),
                         toTime = obj.optString("to_time", "5:00 pm"),
                         daysLabel = obj.optString("days_label", "Weekdays"),
-                        activeDays = activeDaysSet.ifEmpty { setOf(0, 1, 2, 3, 4) },
+                        activeDays = if (daysArr == null) setOf(0, 1, 2, 3, 4) else activeDaysSet,
                         blockedAppIds = blockedAppsList,
                         isHardMode = obj.optBoolean("is_hard_mode", false),
                         allowBreaks = obj.optBoolean("allow_breaks", true),
@@ -331,7 +442,7 @@ class OpalRepository(private val context: Context? = null) {
                     )
                 )
             }
-            return list.ifEmpty { defaultRules }
+            return list
         } catch (_: Throwable) {
             return defaultRules
         }
@@ -500,17 +611,14 @@ class OpalRepository(private val context: Context? = null) {
         _profileFlow.update { it.copy(isPro = enabled) }
     }
 
+    @Synchronized
     fun useEmergencyPass(): Boolean {
-        var success = false
-        _profileFlow.update {
-            if (it.emergencyPassesRemaining > 0) {
-                success = true
-                it.copy(emergencyPassesRemaining = it.emergencyPassesRemaining - 1)
-            } else {
-                it
-            }
-        }
-        return success
+        val remaining = _profileFlow.value.emergencyPassesRemaining
+        if (remaining <= 0) return false
+        val updated = (remaining - 1).coerceAtLeast(0)
+        prefs?.edit()?.putInt("emergency_passes_remaining", updated)?.apply()
+        _profileFlow.update { it.copy(emergencyPassesRemaining = updated) }
+        return true
     }
 
     fun addCustomRule(newRule: BlockRule) {
@@ -670,18 +778,12 @@ class OpalRepository(private val context: Context? = null) {
             .map { it.name }
             .toSet()
 
-        val activeRulesCount = _rulesFlow.value.count { !it.isPaused }
         val effectiveBlockedPackages = blockedPackageNames + timerSessionBlockedPackages
         OpalAccessibilityService.blockedPackages = effectiveBlockedPackages
-        if (blockedWebsiteDomains.isNotEmpty()) {
-            val combinedWebsites = OpalAccessibilityService.blockedWebsites + blockedWebsiteDomains
-            OpalAccessibilityService.updateBlockedWebsites(combinedWebsites)
-        }
-        OpalAccessibilityService.isBlockingActive = activeRulesCount > 0 ||
-                effectiveBlockedPackages.isNotEmpty() ||
-                OpalAccessibilityService.blockedWebsites.isNotEmpty()
+        OpalAccessibilityService.updateCustomBlockedWebsites(blockedWebsiteDomains)
         context?.let { ctx ->
             try {
+                syncTimeBasedRuleBlocking(ctx)
                 com.example.vpn.service.BlockingManager.getInstance(ctx).onBlockingTargetsChanged()
             } catch (_: Exception) { }
         }
@@ -880,7 +982,7 @@ class OpalRepository(private val context: Context? = null) {
                         name = obj.optString("name", "Alarm"),
                         isEnabled = obj.optBoolean("is_enabled", true),
                         recurrence = AlarmRecurrence.valueOf(obj.optString("recurrence", "DAILY")),
-                        selectedDays = daysSet.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                        selectedDays = if (daysArr == null) setOf(1, 2, 3, 4, 5) else daysSet,
                         specificDateMillis = if (obj.has("specific_date")) obj.getLong("specific_date") else null,
                         ringtoneId = obj.optString("ringtone_id", "zen_crystal"),
                         ringtoneName = obj.optString("ringtone_name", "Zen Crystal Chime"),
@@ -892,7 +994,7 @@ class OpalRepository(private val context: Context? = null) {
                     )
                 )
             }
-            list.ifEmpty { defaultAlarms }
+            list
         } catch (_: Throwable) {
             defaultAlarms
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.vpn.db.BlockingScheduleDao
 import com.example.vpn.db.BlockingScheduleEntity
 import com.example.vpn.db.WebsiteBlockDatabase
+import com.example.vpn.dns.DomainMatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -11,6 +12,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.text.ParsePosition
 
 class BlockingScheduleRepository(
@@ -34,13 +36,17 @@ class BlockingScheduleRepository(
     ) = withContext(Dispatchers.IO) {
         require(startHour in 0..23 && endHour in 0..23)
         require(startMinute in 0..59 && endMinute in 0..59)
+        require(activeDays.isNotEmpty()) { "Select at least one active day" }
         require(activeDays.all { it in 0..6 })
+        require(categories.isNotEmpty() || customDomains.isNotEmpty()) { "Select at least one blocking category or domain" }
+        require(categories.none { it.contains(',') }) { "Category names cannot contain commas" }
+        require(customDomains.all { DomainMatcher.isValidDomain(it) }) { "A scheduled domain is invalid" }
         require(startDateIso == null || isValidDate(startDateIso))
         require(endDateIso == null || isValidDate(endDateIso))
         require(startDateIso == null || endDateIso == null || startDateIso <= endDateIso)
         scheduleDao.insertSchedule(
             BlockingScheduleEntity(
-                id = "sched_${System.currentTimeMillis()}",
+                id = "sched_${UUID.randomUUID()}",
                 title = title.trim().ifBlank { "Website blocking" },
                 startHour = startHour,
                 startMinute = startMinute,

@@ -22,8 +22,11 @@ interface BlockedWebsiteDao {
     @Query("SELECT * FROM blocked_domains WHERE category = :category ORDER BY domain ASC")
     fun getDomainsByCategory(category: String): Flow<List<BlockedDomainEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDomain(domain: BlockedDomainEntity)
+    @Query("SELECT * FROM blocked_domains WHERE domain = :domain LIMIT 1")
+    suspend fun getDomainByName(domain: String): BlockedDomainEntity?
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertDomain(domain: BlockedDomainEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDomains(domains: List<BlockedDomainEntity>)
@@ -37,8 +40,11 @@ interface BlockedWebsiteDao {
     @Query("UPDATE blocked_domains SET isFavorite = :isFavorite WHERE domain = :domain")
     suspend fun updateDomainFavorite(domain: String, isFavorite: Boolean)
 
-    @Query("UPDATE blocked_domains SET isPermanent = :isPermanent, expiresAtMillis = CASE WHEN :isPermanent = 1 THEN 0 ELSE expiresAtMillis END WHERE domain = :domain")
-    suspend fun updateDomainPermanent(domain: String, isPermanent: Boolean)
+    @Query("UPDATE blocked_domains SET isPermanent = 1, previousExpiryMillis = expiresAtMillis WHERE domain = :domain AND isPermanent = 0")
+    suspend fun markDomainPermanent(domain: String)
+
+    @Query("UPDATE blocked_domains SET isPermanent = 0, expiresAtMillis = CASE WHEN previousExpiryMillis IS NOT NULL THEN previousExpiryMillis WHEN isCustom = 1 AND expiresAtMillis = 0 THEN :renewedUntil ELSE expiresAtMillis END, previousExpiryMillis = NULL WHERE domain = :domain")
+    suspend fun clearDomainPermanent(domain: String, renewedUntil: Long)
 
     @Query("SELECT COUNT(*) FROM blocked_domains")
     suspend fun getDomainCount(): Int
@@ -64,6 +70,9 @@ interface WebsiteCategoryDao {
 
     @Query("UPDATE website_categories SET isEnabled = :isEnabled WHERE name = :name")
     suspend fun updateCategoryEnabled(name: String, isEnabled: Boolean)
+
+    @Query("UPDATE blocked_domains SET category = 'Custom Websites' WHERE category = :name")
+    suspend fun moveDomainsToDefaultCategory(name: String)
 
     @Query("DELETE FROM website_categories WHERE name = :name AND isCustom = 1")
     suspend fun deleteCustomCategory(name: String)

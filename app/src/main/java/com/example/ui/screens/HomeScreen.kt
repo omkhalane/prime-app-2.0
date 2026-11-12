@@ -153,7 +153,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "PRIME Discipline Hub & Badges",
+                            text = "Your progress & achievements",
                             color = PrimeTextPrimary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -395,7 +395,7 @@ fun HomeScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (uiState.isVpnRunning) "Local VPN Active" else "DNS Shield Off",
+                                        text = if (uiState.isVpnRunning) "Protection is active" else "Protection is off",
                                         color = if (uiState.isVpnRunning) PrimeAccent else PrimeTextTertiary,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium
@@ -437,7 +437,7 @@ fun HomeScreen(
                 ProductivityHubCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
 
                 // Clean bottom padding for navigation bar
-                Spacer(modifier = Modifier.height(96.dp))
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }

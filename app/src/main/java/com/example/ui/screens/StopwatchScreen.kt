@@ -123,7 +123,7 @@ fun StopwatchScreen(
                     icon = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Back",
                     onClick = onBack,
-                    containerSize = 40.dp,
+                    containerSize = 44.dp,
                     iconSize = 20.dp,
                     testTag = "stopwatch_back_button"
                 )

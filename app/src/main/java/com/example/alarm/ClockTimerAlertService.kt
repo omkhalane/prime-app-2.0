@@ -18,7 +18,14 @@ class ClockTimerAlertService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
+        // START_STICKY can restart a killed service with a null Intent. Do not
+        // interpret that as a new timer completion or start a phantom alarm.
+        if (intent == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (intent.action == ACTION_STOP) {
             if (ownsPlayback) AlarmSoundManager.stopPlayback(this)
             ownsPlayback = false
             stopForeground(STOP_FOREGROUND_REMOVE)

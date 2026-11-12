@@ -163,7 +163,7 @@ fun PomodoroScreen(
                     icon = Icons.AutoMirrored.Rounded.ArrowBack,
                     contentDescription = "Back",
                     onClick = onBack,
-                    containerSize = 40.dp,
+                    containerSize = 44.dp,
                     iconSize = 20.dp,
                     testTag = "pomodoro_back_button"
                 )

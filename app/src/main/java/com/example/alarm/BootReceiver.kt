@@ -13,7 +13,7 @@ class BootReceiver : BroadcastReceiver() {
             action == Intent.ACTION_MY_PACKAGE_REPLACED ||
             action == "android.intent.action.QUICKBOOT_POWERON"
         ) {
-            val repository = OpalRepository(context)
+            val repository = OpalRepository(context, loadAppsOnInit = false)
             val enabledAlarms = repository.alarmsFlow.value.filter { it.isEnabled }
             for (alarm in enabledAlarms) {
                 AlarmSchedulerHelper.scheduleAlarm(context, alarm)

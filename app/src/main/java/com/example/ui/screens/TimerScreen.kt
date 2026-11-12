@@ -182,7 +182,7 @@ fun TimerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Timer",
+                    text = "Focus",
                     color = PrimeTextPrimary,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,

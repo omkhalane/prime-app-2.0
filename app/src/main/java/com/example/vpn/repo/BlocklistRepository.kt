@@ -39,6 +39,9 @@ class BlocklistRepository(
 
     fun getActiveBlockedDomains(): Flow<List<BlockedDomainEntity>> = domainDao.getActiveBlockedDomains()
 
+    suspend fun isDomainPermanent(domain: String): Boolean =
+        domainDao.getDomainByName(DomainMatcher.normalize(domain))?.isPermanent == true
+
     fun getDomainsByCategory(category: String): Flow<List<BlockedDomainEntity>> = domainDao.getDomainsByCategory(category)
 
     fun getAllCategories(): Flow<List<CategoryEntity>> = categoryDao.getAllCategories()
@@ -52,7 +55,8 @@ class BlocklistRepository(
         durationMillis: Long = 24L * 60L * 60L * 1000L
     ): Boolean = withContext(Dispatchers.IO) {
         val norm = DomainMatcher.normalize(rawDomain)
-        if (norm.isEmpty() || !norm.contains('.')) return@withContext false
+        if (!DomainMatcher.isValidDomain(rawDomain)) return@withContext false
+        if (!isPermanent && durationMillis <= 0L) return@withContext false
 
         val entity = BlockedDomainEntity(
             domain = norm,
@@ -61,10 +65,9 @@ class BlocklistRepository(
             isEnabled = true,
             isFavorite = true,
             isPermanent = isPermanent,
-            expiresAtMillis = if (isPermanent || durationMillis <= 0L) 0L else System.currentTimeMillis() + durationMillis
+            expiresAtMillis = if (isPermanent) 0L else System.currentTimeMillis() + durationMillis.coerceAtMost(365L * 24L * 60L * 60L * 1000L)
         )
-        domainDao.insertDomain(entity)
-        true
+        domainDao.insertDomain(entity) != -1L
     }
 
     suspend fun deleteDomain(domain: String) = withContext(Dispatchers.IO) {
@@ -81,7 +84,13 @@ class BlocklistRepository(
     }
 
     suspend fun toggleDomainPermanent(domain: String, isPermanent: Boolean) = withContext(Dispatchers.IO) {
-        domainDao.updateDomainPermanent(DomainMatcher.normalize(domain), isPermanent)
+        val normalized = DomainMatcher.normalize(domain)
+        if (isPermanent) {
+            domainDao.markDomainPermanent(normalized)
+        } else {
+            val renewedUntil = System.currentTimeMillis() + 24L * 60L * 60L * 1000L
+            domainDao.clearDomainPermanent(normalized, renewedUntil)
+        }
     }
 
     suspend fun toggleCategoryEnabled(categoryName: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
@@ -90,6 +99,7 @@ class BlocklistRepository(
 
     suspend fun addCustomCategory(name: String, description: String, colorHex: Long) = withContext(Dispatchers.IO) {
         require(name.isNotBlank())
+        require(!name.contains(',')) { "Category names cannot contain commas" }
         require(categoryDao.getCategoryByName(name.trim()) == null) { "A category with this name already exists" }
         val cat = CategoryEntity(
             name = name.trim(),
@@ -104,6 +114,7 @@ class BlocklistRepository(
     }
 
     suspend fun deleteCustomCategory(name: String) = withContext(Dispatchers.IO) {
+        categoryDao.moveDomainsToDefaultCategory(name)
         categoryDao.deleteCustomCategory(name)
     }
 
@@ -130,7 +141,7 @@ class BlocklistRepository(
             val isCatActive = activeCategories.contains(domainEntity.category)
             val isSessionExplicit = sessionDomains.contains(domainEntity.domain)
             val isPermanent = domainEntity.isPermanent
-            val isNotExpired = domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
+            val isNotExpired = domainEntity.isPermanent || domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
 
             if (isNotExpired && (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive))) {
                 resultMap[domainEntity.domain] = domainEntity.category

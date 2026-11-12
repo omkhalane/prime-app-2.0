@@ -21,7 +21,7 @@ object StreakTracker {
     private const val KEY_ACTIVE_DATES = "active_dates"
     private const val KEY_BEST_STREAK = "best_streak"
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    private fun formatDate(date: Date): String = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
 
     private fun getPrefs(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -32,9 +32,10 @@ object StreakTracker {
      * If user already logged today, keeps it.
      * On a new day, increments streak by +1 if consecutive!
      */
+    @Synchronized
     fun logActivityToday(context: Context) {
         val prefs = getPrefs(context)
-        val todayStr = dateFormat.format(Date())
+        val todayStr = formatDate(Date())
         val currentSet = prefs.getStringSet(KEY_ACTIVE_DATES, emptySet())?.toMutableSet() ?: mutableSetOf()
 
         if (!currentSet.contains(todayStr)) {
@@ -53,10 +54,11 @@ object StreakTracker {
      * Starts strictly from 0 for 0 active days.
      * Increments to +1 on each consecutive day change with recorded activity.
      */
+    @Synchronized
     fun getStreakInfo(context: Context): StreakInfo {
         val prefs = getPrefs(context)
         val dates = prefs.getStringSet(KEY_ACTIVE_DATES, emptySet()) ?: emptySet()
-        val todayStr = dateFormat.format(Date())
+        val todayStr = formatDate(Date())
         val isActiveToday = dates.contains(todayStr)
 
         val currentStreak = calculateStreakFromDates(dates)
@@ -75,6 +77,7 @@ object StreakTracker {
     /**
      * Reset streaks (for testing or fresh start).
      */
+    @Synchronized
     fun resetStreak(context: Context) {
         getPrefs(context).edit().clear().apply()
     }
@@ -90,17 +93,17 @@ object StreakTracker {
         if (dates.isEmpty()) return 0
 
         val cal = Calendar.getInstance()
-        val todayStr = dateFormat.format(cal.time)
+        val todayStr = formatDate(cal.time)
 
         cal.add(Calendar.DAY_OF_YEAR, -1)
-        val yesterdayStr = dateFormat.format(cal.time)
+        val yesterdayStr = formatDate(cal.time)
 
         val checkCal = Calendar.getInstance()
 
         return if (dates.contains(todayStr)) {
             var streak = 0
             while (true) {
-                val dateStr = dateFormat.format(checkCal.time)
+                val dateStr = formatDate(checkCal.time)
                 if (dates.contains(dateStr)) {
                     streak++
                     checkCal.add(Calendar.DAY_OF_YEAR, -1)
@@ -113,7 +116,7 @@ object StreakTracker {
             var streak = 0
             checkCal.add(Calendar.DAY_OF_YEAR, -1)
             while (true) {
-                val dateStr = dateFormat.format(checkCal.time)
+                val dateStr = formatDate(checkCal.time)
                 if (dates.contains(dateStr)) {
                     streak++
                     checkCal.add(Calendar.DAY_OF_YEAR, -1)
@@ -134,7 +137,7 @@ object StreakTracker {
 
         val result = mutableListOf<Boolean>()
         for (i in 0 until 7) {
-            val dateStr = dateFormat.format(cal.time)
+            val dateStr = formatDate(cal.time)
             result.add(dates.contains(dateStr))
             cal.add(Calendar.DAY_OF_WEEK, 1)
         }

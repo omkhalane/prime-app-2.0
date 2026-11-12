@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,7 +28,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Info
@@ -74,9 +76,12 @@ fun SettingsScreen(
     onTryProClick: () -> Unit,
     onUseEmergencyPass: () -> Unit,
     onReplayOnboarding: () -> Unit,
+    showBackButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
+
+    BackHandler(onBack = onBackClick)
 
     Column(
         modifier = modifier
@@ -88,36 +93,45 @@ fun SettingsScreen(
     ) {
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Top bar with back button and title
+        // Profile header
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF16191D))
-                    .border(1.dp, Color(0x26FFFFFF), CircleShape)
-                    .clickable { onBackClick() }
-                    .testTag("settings_back_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = OpalTextPrimary,
-                    modifier = Modifier.size(20.dp)
+            if (showBackButton) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF161616))
+                        .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                        .clickable { onBackClick() }
+                        .testTag("settings_back_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = OpalTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+            }
+            Column {
+                Text(
+                    text = "Your profile",
+                    color = OpalTextPrimary,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.4).sp
+                )
+                Text(
+                    text = "Personalize your PRIME experience",
+                    color = OpalTextSecondary,
+                    fontSize = 13.sp
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = "Settings",
-                color = OpalTextPrimary,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.4).sp
-            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -142,9 +156,9 @@ fun SettingsScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xD914181F))
-                .border(1.dp, Color(0x3300E59A), RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(20.dp))
+                .background(OpalCardBg)
+                .border(1.dp, OpalCardBorder, RoundedCornerShape(26.dp))
                 .padding(22.dp)
         ) {
             Column {
@@ -180,7 +194,7 @@ fun SettingsScreen(
                         containerColor = OpalMintLight,
                         contentColor = Color.Black
                     ),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
@@ -216,19 +230,19 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.AutoAwesome,
                 title = "Autofocus",
-                subtitle = "Automatically trigger focus blocks"
+                subtitle = "Coming soon"
             )
-            HorizontalDivider(color = Color(0xFF23272C))
+            HorizontalDivider(color = OpalCardBorder)
             SettingsItemRow(
                 icon = Icons.Default.Shield,
                 title = "Block screens",
-                subtitle = "Personalize your block screens"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
                 icon = Icons.Default.HourglassTop,
                 title = "Waiting room",
-                subtitle = "Customize your waiting room timer"
+                subtitle = "Coming soon"
             )
         }
 
@@ -238,9 +252,9 @@ fun SettingsScreen(
         SectionTitle(title = "Support")
         SettingsCard {
             SettingsItemRow(
-                icon = Icons.Default.HelpOutline,
+                icon = Icons.AutoMirrored.Filled.HelpOutline,
                 title = "Help centre",
-                subtitle = "Guides and answers"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             Row(
@@ -267,7 +281,7 @@ fun SettingsScreen(
                     )
                 }
                 Text(
-                    text = "${profile.emergencyPassesRemaining} left (tap to test)",
+                    text = "${profile.emergencyPassesRemaining} remaining",
                     color = OpalMint,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
@@ -303,7 +317,7 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = "Block apps on your Mac too",
+                            text = "Coming soon",
                             color = OpalTextSecondary,
                             fontSize = 13.sp
                         )
@@ -355,13 +369,13 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.ToggleOn,
                 title = "Permissions",
-                subtitle = "Display over other apps, Screen time"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
                 icon = Icons.Default.Restore,
                 title = "Restore purchase",
-                subtitle = null
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
@@ -378,7 +392,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF1B1E22))
+                .background(OpalCardBg)
                 .border(1.dp, OpalCardBorder, RoundedCornerShape(20.dp))
                 .padding(16.dp)
         ) {
@@ -388,7 +402,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Community forum",
+                    text = "Community forum · Coming soon",
                     color = OpalTextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
