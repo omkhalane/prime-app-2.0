@@ -68,6 +68,9 @@ interface WebsiteCategoryDao {
     @Query("UPDATE website_categories SET isEnabled = :isEnabled WHERE name = :name")
     suspend fun updateCategoryEnabled(name: String, isEnabled: Boolean)
 
+    @Query("UPDATE blocked_domains SET category = 'Custom Websites' WHERE category = :name")
+    suspend fun moveDomainsToDefaultCategory(name: String)
+
     @Query("DELETE FROM website_categories WHERE name = :name AND isCustom = 1")
     suspend fun deleteCustomCategory(name: String)
 
