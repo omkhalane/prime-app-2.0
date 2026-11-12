@@ -60,7 +60,7 @@ import com.example.vpn.db.BlockedDomainEntity
 fun CustomBlocklistScreen(
     customDomains: List<BlockedDomainEntity>,
     onBackClick: () -> Unit,
-    onAddDomain: (String, Boolean) -> Unit,
+    onAddDomain: (String, Boolean, Long) -> Unit,
     onDeleteDomain: (String) -> Unit,
     onTogglePermanent: (String, Boolean) -> Unit,
     onToggleEnabled: (String, Boolean) -> Unit,
@@ -246,6 +246,7 @@ fun CustomBlocklistScreen(
     if (isAddDialogOpen) {
         var inputDomain by remember { mutableStateOf("") }
         var isPermanent by remember { mutableStateOf(false) }
+        var durationHours by remember { mutableStateOf("24") }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { isAddDialogOpen = false }) {
             Box(
@@ -288,6 +289,17 @@ fun CustomBlocklistScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    if (!isPermanent) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = durationHours,
+                            onValueChange = { durationHours = it.filter(Char::isDigit).take(4) },
+                            label = { Text("Block duration (hours)", color = PrimeTextSecondary) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -347,7 +359,8 @@ fun CustomBlocklistScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (inputDomain.isNotBlank()) PrimeAccent else Color(0xFF333333))
                                 .clickable(enabled = inputDomain.isNotBlank()) {
-                                    onAddDomain(inputDomain, isPermanent)
+                                    val hours = durationHours.toLongOrNull()?.coerceIn(1L, 8760L) ?: 24L
+                                    onAddDomain(inputDomain, isPermanent, if (isPermanent) 0L else hours * 60L * 60L * 1000L)
                                     isAddDialogOpen = false
                                 },
                             contentAlignment = Alignment.Center
