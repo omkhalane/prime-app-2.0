@@ -22,6 +22,7 @@ import com.example.service.OpalAccessibilityService
 import com.example.util.FaviconManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -113,7 +114,7 @@ class OpalRepository(private val context: Context? = null) {
 
 
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Temporary timer-session targets must survive normal dashboard refreshes.
     private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
 
@@ -307,7 +308,8 @@ class OpalRepository(private val context: Context? = null) {
     private val _profileFlow = MutableStateFlow(
         UserProfile(
             name = prefs?.getString("user_name", "omk") ?: "omk",
-            isPro = prefs?.getBoolean("is_pro", false) ?: false
+            isPro = prefs?.getBoolean("is_pro", false) ?: false,
+            emergencyPassesRemaining = (prefs?.getInt("emergency_passes_remaining", 1) ?: 1).coerceIn(0, 1)
         )
     )
     val profileFlow: StateFlow<UserProfile> = _profileFlow.asStateFlow()
@@ -580,17 +582,14 @@ class OpalRepository(private val context: Context? = null) {
         _profileFlow.update { it.copy(isPro = enabled) }
     }
 
+    @Synchronized
     fun useEmergencyPass(): Boolean {
-        var success = false
-        _profileFlow.update {
-            if (it.emergencyPassesRemaining > 0) {
-                success = true
-                it.copy(emergencyPassesRemaining = it.emergencyPassesRemaining - 1)
-            } else {
-                it
-            }
-        }
-        return success
+        val remaining = _profileFlow.value.emergencyPassesRemaining
+        if (remaining <= 0) return false
+        val updated = (remaining - 1).coerceAtLeast(0)
+        prefs?.edit()?.putInt("emergency_passes_remaining", updated)?.apply()
+        _profileFlow.update { it.copy(emergencyPassesRemaining = updated) }
+        return true
     }
 
     fun addCustomRule(newRule: BlockRule) {
