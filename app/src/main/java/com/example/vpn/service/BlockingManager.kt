@@ -61,8 +61,9 @@ class BlockingManager private constructor(private val context: Context) {
         scope.launch {
             reconcileActiveRules()
             while (isActive) {
-                delay(15_000L)
-                checkpointBlockingDuration()
+                // Re-evaluate date/time rules at their boundaries even when the UI is closed.
+                delay(30_000L)
+                reconcileActiveRules()
             }
         }
     }
