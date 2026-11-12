@@ -415,7 +415,7 @@ object RealScreenTimeTracker {
             lower.contains("jio") -> 0xFF0A2885
             else -> {
                 val colors = listOf(0xFF5DF2B5, 0xFF4285F4, 0xFF9C27B0, 0xFFFF9800, 0xFF00BCD4, 0xFF00E676)
-                colors[Math.abs(name.hashCode()) % colors.size]
+                colors[Math.floorMod(name.hashCode(), colors.size)]
             }
         }
     }
