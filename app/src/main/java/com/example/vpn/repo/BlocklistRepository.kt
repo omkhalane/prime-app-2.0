@@ -48,7 +48,8 @@ class BlocklistRepository(
     suspend fun addCustomDomain(
         rawDomain: String,
         category: String = "Custom Websites",
-        isPermanent: Boolean = false
+        isPermanent: Boolean = false,
+        durationMillis: Long = 24L * 60L * 60L * 1000L
     ): Boolean = withContext(Dispatchers.IO) {
         val norm = DomainMatcher.normalize(rawDomain)
         if (norm.isEmpty() || !norm.contains('.')) return@withContext false
@@ -59,7 +60,8 @@ class BlocklistRepository(
             isCustom = true,
             isEnabled = true,
             isFavorite = true,
-            isPermanent = isPermanent
+            isPermanent = isPermanent,
+            expiresAtMillis = if (isPermanent || durationMillis <= 0L) 0L else System.currentTimeMillis() + durationMillis
         )
         domainDao.insertDomain(entity)
         true
@@ -125,8 +127,9 @@ class BlocklistRepository(
             val isCatActive = activeCategories.contains(domainEntity.category)
             val isSessionExplicit = sessionDomains.contains(domainEntity.domain)
             val isPermanent = domainEntity.isPermanent
+            val isNotExpired = domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
 
-            if (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive)) {
+            if (isNotExpired && (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive))) {
                 resultMap[domainEntity.domain] = domainEntity.category
             }
         }
