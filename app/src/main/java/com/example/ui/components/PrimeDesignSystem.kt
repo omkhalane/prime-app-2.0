@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -133,13 +134,15 @@ fun PrimeMetricCard(
     detail: String? = null,
     modifier: Modifier = Modifier,
     accent: Color = PrimeAccent,
-    icon: ImageVector? = null
+    icon: ImageVector? = null,
+    onClick: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(PrimeCorners.card))
             .background(PrimeSurfaceElevated)
             .border(1.dp, PrimeSubtleBorder, RoundedCornerShape(PrimeCorners.card))
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
