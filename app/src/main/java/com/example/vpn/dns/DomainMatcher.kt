@@ -1,6 +1,6 @@
 package com.example.vpn.dns
 
-import java.net.URI
+import java.net.IDN
 import java.util.Locale
 
 object DomainMatcher {
@@ -48,7 +48,25 @@ object DomainMatcher {
         }
         cleaned = cleaned.removeSuffix(".")
 
-        return cleaned
+        cleaned = cleaned.removeSuffix(".")
+        return try {
+            IDN.toASCII(cleaned, IDN.USE_STD3_ASCII_RULES).lowercase(Locale.ROOT)
+        } catch (_: IllegalArgumentException) {
+            cleaned
+        }
+    }
+
+    /** Returns true only for a syntactically valid DNS hostname or IPv4 literal. */
+    fun isValidDomain(rawDomain: String): Boolean {
+        val normalized = normalize(rawDomain)
+        if (normalized.isBlank() || normalized.length > 253 || normalized.any { it.isWhitespace() || it == '@' || it == '/' }) return false
+        val labels = normalized.split('.')
+        if (labels.size < 2) return false
+        return labels.all { label ->
+            label.isNotEmpty() && label.length <= 63 &&
+                label.first().isLetterOrDigit() && label.last().isLetterOrDigit() &&
+                label.all { it.isLetterOrDigit() || it == '-' }
+        }
     }
 
     /**
