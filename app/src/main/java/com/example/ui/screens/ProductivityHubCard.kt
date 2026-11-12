@@ -48,7 +48,6 @@ import com.example.productivity.data.ProductivityTaskEntity
 import com.example.productivity.data.TaskPriority
 import com.example.productivity.data.TaskRecurrence
 import com.example.ui.theme.PrimeAccent
-import com.example.ui.theme.PrimeBackground
 import com.example.ui.theme.PrimeSubtleBorder
 import com.example.ui.theme.PrimeSurface
 import com.example.ui.theme.PrimeSurfaceElevated
@@ -113,7 +112,7 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
             androidx.compose.material3.HorizontalDivider(color=PrimeSubtleBorder)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.CheckCircle, contentDescription=null, tint=PrimeAccent, modifier=Modifier.size(18.dp))
-                Text("  HABITS · ${checkIns.count { check -> habits.any { it.id == check.habitId } }}/${habits.size} TODAY", color=Color(0xFFCAD5E8), fontSize=11.sp, fontWeight=FontWeight.SemiBold)
+                Text("  HABITS · ${checkIns.count { check -> habits.any { it.id == check.habitId } }}/${habits.size} TODAY", color=PrimeTextSecondary, fontSize=11.sp, fontWeight=FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick={ title=""; error=null; habitDays=setOf(0,1,2,3,4,5,6); showHabitDialog=true }) { Icon(Icons.Rounded.Add, contentDescription="Add habit", tint=PrimeTextPrimary) }
             }
@@ -123,7 +122,7 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(checked=checked, onCheckedChange={ done -> scope.launch { repository.setHabitDone(habit.id, today, done) } })
                     Column(Modifier.weight(1f)) {
-                        Text(habit.title, color=if(checked) Color(0xFF7E8BA1) else Color.White, fontSize=14.sp)
+                        Text(habit.title, color=if(checked) PrimeTextTertiary else Color.White, fontSize=14.sp)
                         Text("Scheduled days: ${(0..6).filter { habit.activeDaysMask and (1 shl it) != 0 }.joinToString(",") { listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")[it] }}", color=PrimeTextTertiary, fontSize=10.sp)
                     }
                     IconButton(onClick={ scope.launch { repository.archiveHabit(habit.id) } }) { Icon(Icons.Rounded.DeleteOutline, contentDescription="Archive habit", tint=PrimeTextSecondary) }
