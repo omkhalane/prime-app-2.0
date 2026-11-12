@@ -54,6 +54,7 @@ import com.example.ui.theme.PrimeSurfaceElevated
 import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeTextSecondary
 import com.example.ui.theme.PrimeTextTertiary
+import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -85,8 +86,11 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
 
     fun parseDueDate(input: String): Long? {
         if (input.isBlank()) return null
+        if (!input.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return Long.MIN_VALUE
         val format = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }
-        val parsed = runCatching { format.parse(input) }.getOrNull() ?: return Long.MIN_VALUE
+        val position = ParsePosition(0)
+        val parsed = format.parse(input, position) ?: return Long.MIN_VALUE
+        if (position.index != input.length) return Long.MIN_VALUE
         return parsed.time
     }
 
@@ -122,7 +126,7 @@ fun ProductivityHubCard(modifier: Modifier = Modifier) {
                 Row(verticalAlignment=Alignment.CenterVertically) {
                     Checkbox(checked=checked, onCheckedChange={ done -> scope.launch { repository.setHabitDone(habit.id, today, done) } })
                     Column(Modifier.weight(1f)) {
-                        Text(habit.title, color=if(checked) PrimeTextTertiary else Color.White, fontSize=14.sp)
+                        Text(habit.title, color=if(checked) PrimeTextTertiary else PrimeTextPrimary, fontSize=14.sp)
                         Text("Scheduled days: ${(0..6).filter { habit.activeDaysMask and (1 shl it) != 0 }.joinToString(",") { listOf("Sun","Mon","Tue","Wed","Thu","Fri","Sat")[it] }}", color=PrimeTextTertiary, fontSize=10.sp)
                     }
                     IconButton(onClick={ scope.launch { repository.archiveHabit(habit.id) } }) { Icon(Icons.Rounded.DeleteOutline, contentDescription="Archive habit", tint=PrimeTextSecondary) }
