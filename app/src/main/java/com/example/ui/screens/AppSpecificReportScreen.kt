@@ -93,7 +93,7 @@ fun AppSpecificReportScreen(
                 icon = Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = "Back",
                 onClick = onBackClick,
-                containerSize = 40.dp,
+                containerSize = 44.dp,
                 iconSize = 20.dp
             )
 
