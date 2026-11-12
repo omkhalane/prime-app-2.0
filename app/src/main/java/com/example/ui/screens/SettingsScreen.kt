@@ -252,7 +252,7 @@ fun SettingsScreen(
         SectionTitle(title = "Support")
         SettingsCard {
             SettingsItemRow(
-                icon = Icons.Default.HelpOutline,
+                icon = Icons.AutoMirrored.Filled.HelpOutline,
                 title = "Help centre",
                 subtitle = "Coming soon"
             )
