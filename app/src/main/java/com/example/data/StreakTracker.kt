@@ -58,7 +58,7 @@ object StreakTracker {
     fun getStreakInfo(context: Context): StreakInfo {
         val prefs = getPrefs(context)
         val dates = prefs.getStringSet(KEY_ACTIVE_DATES, emptySet()) ?: emptySet()
-        val todayStr = dateFormat.format(Date())
+        val todayStr = formatDate(Date())
         val isActiveToday = dates.contains(todayStr)
 
         val currentStreak = calculateStreakFromDates(dates)
@@ -116,7 +116,7 @@ object StreakTracker {
             var streak = 0
             checkCal.add(Calendar.DAY_OF_YEAR, -1)
             while (true) {
-                val dateStr = dateFormat.format(checkCal.time)
+                val dateStr = formatDate(checkCal.time)
                 if (dates.contains(dateStr)) {
                     streak++
                     checkCal.add(Calendar.DAY_OF_YEAR, -1)
@@ -137,7 +137,7 @@ object StreakTracker {
 
         val result = mutableListOf<Boolean>()
         for (i in 0 until 7) {
-            val dateStr = dateFormat.format(cal.time)
+            val dateStr = formatDate(cal.time)
             result.add(dates.contains(dateStr))
             cal.add(Calendar.DAY_OF_WEEK, 1)
         }
