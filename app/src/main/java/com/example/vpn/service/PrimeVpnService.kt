@@ -134,8 +134,10 @@ class PrimeVpnService : VpnService() {
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     setMetered(false)
+                    // Builder.setBlocking was added in Android 10; older releases
+                    // already use a blocking TUN descriptor by default.
+                    setBlocking(true)
                 }
-                setBlocking(true)
             }
 
             vpnInterface = builder.establish()
