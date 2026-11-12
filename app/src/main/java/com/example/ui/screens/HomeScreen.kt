@@ -54,6 +54,8 @@ import com.example.ui.theme.PrimeGlassCardBg
 import com.example.ui.theme.PrimeSurfaceBorderBrush
 import com.example.ui.theme.PrimeSurfaceElevated
 import com.example.ui.theme.PrimeSurfaceHigher
+import com.example.ui.theme.PrimeSurface
+import com.example.ui.theme.PrimeSubtleBorder
 import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeTextSecondary
 import com.example.ui.theme.PrimeTextTertiary
@@ -359,6 +361,9 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .testTag("home_website_blocker_card"),
                     shape = RoundedCornerShape(24.dp),
+                    backgroundColor = PrimeSurface,
+                    borderColor = PrimeSubtleBorder,
+                    borderBrush = null,
                     onClick = onOpenWebsiteBlocker
                 ) {
                     Column {

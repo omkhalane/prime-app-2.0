@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.OnboardingStep
+import com.example.model.OnboardingInputValidator
 import com.example.ui.components.AppIconBadge
 import com.example.ui.theme.OpalBlack
 import com.example.ui.theme.OpalCardBg
@@ -196,7 +197,6 @@ private fun WelcomeRockStep(onNext: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
-            .clickable { onNext() }
             .testTag("onboarding_welcome_step"),
         contentAlignment = Alignment.Center
     ) {
@@ -282,7 +282,7 @@ private fun WelcomeRockStep(onNext: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "TAP ANYWHERE TO CONTINUE",
+                    text = "YOUR JOURNEY STARTS HERE",
                     color = Color(0xFF75757A),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -300,7 +300,9 @@ private fun NameInputStep(
     onNext: () -> Unit,
     onBack: () -> Unit
 ) {
-    var nameText by remember { mutableStateOf(currentName) }
+    var nameText by remember(currentName) { mutableStateOf(currentName) }
+    val normalizedName = OnboardingInputValidator.normalizeName(nameText)
+    val isNameValid = OnboardingInputValidator.isValidName(normalizedName)
 
     Column(
         modifier = Modifier
@@ -343,8 +345,9 @@ private fun NameInputStep(
         OutlinedTextField(
             value = nameText,
             onValueChange = {
-                nameText = it
-                onNameChanged(it)
+                val safeValue = it.filter { char -> char.isLetter() || char.isWhitespace() || char == '-' || char.code == 39 || char == '.' }.take(30)
+                nameText = safeValue
+                onNameChanged(safeValue)
             },
             placeholder = { Text("John", color = OpalTextSecondary) },
             singleLine = true,
@@ -362,13 +365,30 @@ private fun NameInputStep(
                 .testTag("onboarding_name_input")
         )
 
+        if (nameText.isNotBlank() && !isNameValid) {
+            Text(
+                text = "Enter a name between 2 and 30 characters.",
+                color = Color(0xFFFF5B66),
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = onNext,
+            onClick = {
+                if (isNameValid) {
+                    onNameChanged(normalizedName)
+                    onNext()
+                }
+            },
+            enabled = isNameValid,
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF35393F),
-                contentColor = Color.White
+                containerColor = Color(0xFF00E59A),
+                contentColor = Color.Black,
+                disabledContainerColor = Color(0xFF242424),
+                disabledContentColor = Color(0xFF777777)
             ),
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier
@@ -388,140 +408,80 @@ private fun AuthCheckStep(
     onBack: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 36.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         TopBackButton(onBack = onBack)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
+        Spacer(Modifier.height(20.dp))
         Image(
             painter = painterResource(id = R.drawable.prime_logo),
-            contentDescription = "Prime Gemstone",
+            contentDescription = "PRIME logo",
             modifier = Modifier.size(140.dp)
         )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
+        Spacer(Modifier.height(40.dp))
+        Text("Hi, $userName", color = OpalMint, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(18.dp))
         Text(
-            text = "Hi, $userName",
-            color = OpalMint,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Quick check, have we met before?",
+            "A fresh start, on your terms.",
             color = OpalTextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(36.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = onNext,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Yes, sign in", color = Color.White, fontSize = 14.sp)
-            }
-
-            Button(
-                onClick = onNext,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("I'm new to Prime", color = Color.White, fontSize = 14.sp)
-            }
-        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "You can use PRIME without creating an account. Your profile, tasks and routines are stored locally on this device.",
+            color = OpalTextSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onNext,
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) { Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
 @Composable
 private fun AuthOptionsStep(onNext: () -> Unit, onBack: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 36.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         TopBackButton(onBack = onBack)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
+        Spacer(Modifier.height(20.dp))
         Image(
             painter = painterResource(id = R.drawable.prime_logo),
-            contentDescription = "Prime Gemstone",
+            contentDescription = "PRIME logo",
             modifier = Modifier.size(140.dp)
         )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
+        Spacer(Modifier.height(40.dp))
         Text(
-            text = "Let's get your journey started.",
+            "Your data stays on this device",
             color = OpalTextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(36.dp))
-
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Account sign-in and cloud sync are not available yet. You can still use your focus tools, shields, planner and wellbeing features locally.",
+            color = OpalTextSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.weight(1f))
         Button(
             onClick = onNext,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
             shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("Continue with Google", color = Color.Black, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "or", color = OpalTextSecondary, fontSize = 14.sp)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("✉  Continue with email", color = Color.White, fontSize = 15.sp)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("📞  Continue with phone", color = Color.White, fontSize = 15.sp)
-        }
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) { Text("Continue on this device", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -980,7 +940,7 @@ private fun PermissionsIntroStep(
                         text = if (screenTimeGranted)
                             "Usage access granted in Android Settings."
                         else
-                            "Tap to enable. Lets Prime show you your daily screen time and progress.",
+                            "Reads app-usage duration on this device to show your daily screen time and progress.",
                         color = OpalTextSecondary,
                         fontSize = 13.sp
                     )
@@ -997,11 +957,17 @@ private fun PermissionsIntroStep(
             }
         }
 
+        Text(
+            text = "Optional: you can change these permissions anytime in Android Settings.",
+            color = OpalTextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center
+        )
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -1017,7 +983,6 @@ private fun HowItWorks1Step(onNext: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .clickable { onNext() }
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
@@ -1213,7 +1178,7 @@ private fun NotificationsPromptStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xFF22262B))
+                .background(OpalCardBg)
                 .border(1.dp, OpalCardBorder, RoundedCornerShape(28.dp))
                 .padding(28.dp),
             contentAlignment = Alignment.Center
@@ -1222,7 +1187,7 @@ private fun NotificationsPromptStep(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = Color(0xFF4285F4),
+                    tint = OpalMint,
                     modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1280,7 +1245,23 @@ private fun AccessibilityGuideStep(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Why PRIME asks for this",
+                color = OpalMint,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "When enabled, PRIME checks which app is in the foreground and reads browser address-bar text to match your blocklist. This check runs on your device. PRIME does not need page contents or keystrokes. You can skip this permission, but app and browser blocking may be limited.",
+                color = OpalTextSecondary,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             val steps = listOf(
                 "Tap \"Installed apps\"",
@@ -1469,7 +1450,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "$userName,\nPrime will get you back",
+                text = "$userName,\nyour next chapter starts now.",
                 color = OpalTextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
@@ -1477,7 +1458,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "7 years of your life",
+                text = "Become your prime.",
                 color = OpalMintLight,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold
@@ -1488,18 +1469,18 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 BenefitItem(
                     icon = Icons.Default.Security,
-                    title = "30% less screen time",
-                    desc = "Reduce your screen time by 30%, to 4h 54m each day"
+                    title = "More intentional screen time",
+                    desc = "Build healthier screen habits with clear, personal goals."
                 )
                 BenefitItem(
                     icon = Icons.Default.Schedule,
-                    title = "20% productivity boost",
-                    desc = "Reduce distractions during work hours by over 20%"
+                    title = "Protected focus sessions",
+                    desc = "Create focus windows and block distractions when your shields are enabled."
                 )
                 BenefitItem(
                     icon = Icons.Default.CalendarToday,
-                    title = "48 days back this year",
-                    desc = "Develop your focus plan to save up to 48 days this year"
+                    title = "A plan that fits your day",
+                    desc = "Set realistic goals for screen time, focus and daily routines."
                 )
             }
         }
@@ -1514,7 +1495,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
 
             Button(
                 onClick = onComplete,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+                colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier
                     .fillMaxWidth()
