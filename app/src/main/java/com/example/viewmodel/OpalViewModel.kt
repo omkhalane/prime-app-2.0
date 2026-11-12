@@ -1695,19 +1695,24 @@ class OpalViewModel(
     ) {
         viewModelScope.launch {
             val days = daysOfWeek.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
-            blockingManager?.scheduleRepo?.addSchedule(
-                title = title,
-                startHour = startHour,
-                startMinute = startMinute,
-                endHour = endHour,
-                endMinute = endMinute,
-                activeDays = days,
-                categories = categories,
-                startDateIso = startDateIso,
-                endDateIso = endDateIso
-            )
-            blockingManager?.reconcileActiveRules()
-            _uiState.update { it.copy(snackbarMessage = "Schedule '$title' created") }
+            runCatching {
+                blockingManager?.scheduleRepo?.addSchedule(
+                    title = title,
+                    startHour = startHour,
+                    startMinute = startMinute,
+                    endHour = endHour,
+                    endMinute = endMinute,
+                    activeDays = days,
+                    categories = categories,
+                    startDateIso = startDateIso,
+                    endDateIso = endDateIso
+                )
+                blockingManager?.reconcileActiveRules()
+            }.onSuccess {
+                _uiState.update { it.copy(snackbarMessage = "Schedule '$title' created") }
+            }.onFailure { error ->
+                _uiState.update { it.copy(snackbarMessage = error.message ?: "Invalid schedule") }
+            }
         }
     }
 
