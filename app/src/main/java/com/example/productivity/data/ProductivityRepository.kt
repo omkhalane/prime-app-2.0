@@ -58,7 +58,7 @@ class ProductivityRepository(private val dao: ProductivityDao) {
     }
 
     private fun nextOccurrence(from: Long, recurrence: TaskRecurrence): Long {
-        val calendar = java.util.Calendar.getInstance().apply { timeInMillis = from }
+        val calendar = java.util.Calendar.getInstance().apply { timeInMillis = maxOf(from, System.currentTimeMillis()) }
         when (recurrence) {
             TaskRecurrence.NONE -> Unit
             TaskRecurrence.DAILY -> calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
@@ -69,7 +69,12 @@ class ProductivityRepository(private val dao: ProductivityDao) {
                 }
             }
             TaskRecurrence.WEEKLY -> calendar.add(java.util.Calendar.WEEK_OF_YEAR, 1)
-            TaskRecurrence.MONTHLY -> calendar.add(java.util.Calendar.MONTH, 1)
+            TaskRecurrence.MONTHLY -> {
+                val dayOfMonth = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+                calendar.add(java.util.Calendar.MONTH, 1)
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, minOf(dayOfMonth, calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)))
+            }
         }
         return calendar.timeInMillis
     }
@@ -96,7 +101,7 @@ class ProductivityRepository(private val dao: ProductivityDao) {
     suspend fun setHabitDone(habitId: String, localDate: String, done: Boolean): ProductivityResult {
         if (!isValidIsoDate(localDate)) return ProductivityResult.Invalid("Date must be a valid yyyy-MM-dd calendar date.")
         val habit = dao.habit(habitId) ?: return ProductivityResult.NotFound
-        val date = runCatching { SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }.parse(localDate) }.getOrNull()
+        val date = parseIsoDate(localDate)
             ?: return ProductivityResult.Invalid("Calendar date is invalid.")
         val calendar = java.util.Calendar.getInstance().apply { time = date }
         val dayIndex = calendar.get(java.util.Calendar.DAY_OF_WEEK) - 1
@@ -114,8 +119,12 @@ class ProductivityRepository(private val dao: ProductivityDao) {
     fun observeTodayCheckIns(): Flow<List<ProductivityHabitCheckInEntity>> =
         dao.observeCheckInsForDay(SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()))
 
-    private fun isValidIsoDate(value: String): Boolean = runCatching {
+    private fun isValidIsoDate(value: String): Boolean = parseIsoDate(value) != null
+
+    private fun parseIsoDate(value: String): Date? = runCatching {
         val format = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { isLenient = false }
-        format.parse(value) != null
-    }.getOrDefault(false)
+        val position = java.text.ParsePosition(0)
+        val parsed = format.parse(value, position) ?: return@runCatching null
+        if (position.index != value.length || format.format(parsed) != value) null else parsed
+    }.getOrNull()
 }
