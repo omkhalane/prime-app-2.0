@@ -32,6 +32,7 @@ class DnsFilterEngine(private val socketProtector: (DatagramSocket) -> Boolean =
     companion object {
         private const val TAG = "DnsFilterEngine"
         private const val UPSTREAM_TIMEOUT_MS = 2500
+        private const val MAX_DNS_CACHE_ENTRIES = 2048
         val DEFAULT_UPSTREAM_SERVERS = listOf("1.1.1.1", "8.8.8.8", "9.9.9.9", "1.0.0.1")
     }
     private val blockedDomainRules = ConcurrentHashMap<String, String>()
@@ -92,10 +93,22 @@ class DnsFilterEngine(private val socketProtector: (DatagramSocket) -> Boolean =
         val response = forwardToUpstream(dnsPayload, query)
         if (response != null) {
             val ttl = DnsPacketParser.minimumAnswerTtlSeconds(response)?.coerceIn(1L, 3600L) ?: 0L
-            if (ttl > 0L) dnsCache[cacheKey] = CacheEntry(System.currentTimeMillis() + ttl * 1000L, response.clone())
+            if (ttl > 0L) cacheResponse(cacheKey, response, ttl)
             return DnsFilterResult.Allowed(response, domain)
         }
         return DnsFilterResult.Allowed(DnsPacketBuilder.buildHeaderWithRCode(query, DnsPacketBuilder.RCODE_SERVFAIL), domain)
+    }
+
+    private fun cacheResponse(key: String, response: ByteArray, ttlSeconds: Long) {
+        val now = System.currentTimeMillis()
+        if (dnsCache.size >= MAX_DNS_CACHE_ENTRIES) {
+            dnsCache.entries.removeIf { it.value.expiresAt <= now }
+            if (dnsCache.size >= MAX_DNS_CACHE_ENTRIES) {
+                val oldestAvailableKey = dnsCache.keys.iterator().let { if (it.hasNext()) it.next() else null }
+                if (oldestAvailableKey != null) dnsCache.remove(oldestAvailableKey)
+            }
+        }
+        dnsCache[key] = CacheEntry(now + ttlSeconds * 1000L, response.clone())
     }
 
     private fun forwardToUpstream(queryPayload: ByteArray, query: DnsQuery): ByteArray? {
