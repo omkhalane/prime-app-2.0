@@ -31,8 +31,8 @@ interface BlockedWebsiteDao {
     @Query("DELETE FROM blocked_domains WHERE domain = :domain")
     suspend fun deleteDomain(domain: String)
 
-    @Query("UPDATE blocked_domains SET isEnabled = :isEnabled WHERE domain = :domain")
-    suspend fun updateDomainEnabled(domain: String, isEnabled: Boolean)
+    @Query("UPDATE blocked_domains SET isEnabled = :isEnabled, expiresAtMillis = CASE WHEN :isEnabled = 1 AND expiresAtMillis > 0 AND expiresAtMillis <= :now THEN :renewedUntil ELSE expiresAtMillis END WHERE domain = :domain")
+    suspend fun updateDomainEnabled(domain: String, isEnabled: Boolean, now: Long, renewedUntil: Long)
 
     @Query("UPDATE blocked_domains SET isFavorite = :isFavorite WHERE domain = :domain")
     suspend fun updateDomainFavorite(domain: String, isFavorite: Boolean)
