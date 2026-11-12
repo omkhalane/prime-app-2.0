@@ -101,7 +101,7 @@ fun OpalTopBar(
                 Text(
                     text = "BECOME YOUR PRIME",
                     color = PrimeAccent,
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.0.sp
                 )
