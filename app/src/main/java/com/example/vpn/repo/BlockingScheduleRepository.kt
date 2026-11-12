@@ -7,14 +7,17 @@ import com.example.vpn.db.WebsiteBlockDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.text.ParsePosition
 
 class BlockingScheduleRepository(
     private val context: Context,
     private val database: WebsiteBlockDatabase = WebsiteBlockDatabase.getInstance(context)
 ) {
     private val scheduleDao: BlockingScheduleDao = database.scheduleDao()
-
     fun getAllSchedules(): Flow<List<BlockingScheduleEntity>> = scheduleDao.getAllSchedules()
 
     suspend fun addSchedule(
@@ -23,23 +26,34 @@ class BlockingScheduleRepository(
         startMinute: Int,
         endHour: Int,
         endMinute: Int,
-        activeDays: Set<Int>, // 0=Sun..6=Sat
+        activeDays: Set<Int>,
         categories: Set<String>,
-        customDomains: Set<String> = emptySet()
+        customDomains: Set<String> = emptySet(),
+        startDateIso: String? = null,
+        endDateIso: String? = null
     ) = withContext(Dispatchers.IO) {
-        val schedule = BlockingScheduleEntity(
-            id = "sched_${System.currentTimeMillis()}",
-            title = title,
-            startHour = startHour,
-            startMinute = startMinute,
-            endHour = endHour,
-            endMinute = endMinute,
-            activeDaysCsv = activeDays.joinToString(","),
-            blockedCategoriesCsv = categories.joinToString(","),
-            customDomainsCsv = customDomains.joinToString(","),
-            isEnabled = true
+        require(startHour in 0..23 && endHour in 0..23)
+        require(startMinute in 0..59 && endMinute in 0..59)
+        require(activeDays.all { it in 0..6 })
+        require(startDateIso == null || isValidDate(startDateIso))
+        require(endDateIso == null || isValidDate(endDateIso))
+        require(startDateIso == null || endDateIso == null || startDateIso <= endDateIso)
+        scheduleDao.insertSchedule(
+            BlockingScheduleEntity(
+                id = "sched_${System.currentTimeMillis()}",
+                title = title.trim().ifBlank { "Website blocking" },
+                startHour = startHour,
+                startMinute = startMinute,
+                endHour = endHour,
+                endMinute = endMinute,
+                activeDaysCsv = activeDays.sorted().joinToString(","),
+                blockedCategoriesCsv = categories.joinToString(","),
+                customDomainsCsv = customDomains.joinToString(","),
+                startDateIso = startDateIso,
+                endDateIso = endDateIso,
+                isEnabled = true
+            )
         )
-        scheduleDao.insertSchedule(schedule)
     }
 
     suspend fun toggleScheduleEnabled(id: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
@@ -51,24 +65,42 @@ class BlockingScheduleRepository(
     }
 
     suspend fun getCurrentlyActiveSchedules(): List<BlockingScheduleEntity> = withContext(Dispatchers.IO) {
-        val all = scheduleDao.getActiveSchedulesSync()
-        val cal = Calendar.getInstance()
-        val currentDay = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0=Sun..6=Sat
-        val currentMinutesOfDay = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val now = Calendar.getInstance()
+        val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        val today = dateKey(now.time)
+        val todayDay = now.get(Calendar.DAY_OF_WEEK) - 1
+        val previous = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val previousDay = previous.get(Calendar.DAY_OF_WEEK) - 1
+        val previousDate = dateKey(previous.time)
 
-        all.filter { schedule ->
-            val days = schedule.activeDaysCsv.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
-            if (!days.contains(currentDay)) return@filter false
+        scheduleDao.getActiveSchedulesSync().filter { schedule ->
+            val start = schedule.startHour * 60 + schedule.startMinute
+            val end = schedule.endHour * 60 + schedule.endMinute
+            val overnight = end <= start
 
-            val startMin = schedule.startHour * 60 + schedule.startMinute
-            val endMin = schedule.endHour * 60 + schedule.endMinute
-
-            if (startMin <= endMin) {
-                currentMinutesOfDay in startMin..endMin
-            } else {
-                // Crosses midnight (e.g. 22:00 to 06:00)
-                currentMinutesOfDay >= startMin || currentMinutesOfDay <= endMin
+            val matchesDate: (String) -> Boolean = { date ->
+                (schedule.startDateIso == null || date >= schedule.startDateIso) &&
+                    (schedule.endDateIso == null || date <= schedule.endDateIso)
             }
+            val days = schedule.activeDaysCsv.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+
+            val activeFromToday = days.contains(todayDay) && matchesDate(today) &&
+                if (overnight) currentMinutes >= start else currentMinutes in start until end
+            val activeFromYesterday = overnight && currentMinutes < end &&
+                days.contains(previousDay) && matchesDate(previousDate)
+            activeFromToday || activeFromYesterday
         }
+    }
+
+    private fun dateKey(date: Date): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+
+    private fun isValidDate(value: String): Boolean = try {
+        val format = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
+        val position = ParsePosition(0)
+        val parsed = format.parse(value, position)
+        parsed != null && position.index == value.length
+    } catch (_: Exception) {
+        false
     }
 }

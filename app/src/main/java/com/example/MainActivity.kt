@@ -1,11 +1,15 @@
 package com.example
 
 import android.Manifest
+import android.app.Activity
 import android.os.Build
 import android.os.Bundle
-import android.app.Activity
 import android.content.Context
-import androidx.activity.ComponentActivity
+import android.content.ContextWrapper
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricManager
+import androidx.fragment.app.FragmentActivity
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -21,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -74,7 +79,7 @@ import com.example.util.PermissionHelper
 import com.example.viewmodel.OpalViewModel
 import com.example.viewmodel.TimerToolSubscreen
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -105,6 +110,7 @@ fun OpalApp() {
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val pendingSystemAuthAction = remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // Launcher for real Android 13+ Notification Runtime Permission
     val notificationLauncher = rememberLauncherForActivityResult(
@@ -121,14 +127,43 @@ fun OpalApp() {
         viewModel.nextOnboardingStep()
     }
 
-    // Launcher for real Android System Device Credentials (Lock Screen PIN / Pattern / Password / Biometrics)
-    val confirmDeviceCredentialLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            viewModel.onReauthSuccess()
-        } else {
+    // Android-managed biometric or device-credential authentication.
+    val activity = context.findFragmentActivity()
+    val requestDeviceReauth: (() -> Unit) -> Unit = { onAuthenticated ->
+        if (!DeviceSecurityHelper.isDeviceSecure(context) || activity == null) {
             viewModel.onReauthFailure()
+        } else {
+            val prompt = BiometricPrompt(
+                activity,
+                ContextCompat.getMainExecutor(activity),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        val pending = pendingSystemAuthAction.value
+                        pendingSystemAuthAction.value = null
+                        pending?.invoke() ?: onAuthenticated()
+                    }
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        pendingSystemAuthAction.value = null
+                        viewModel.onReauthFailure()
+                    }
+                }
+            )
+            val promptBuilder = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Verify it's you")
+                .setSubtitle("Use your fingerprint, biometrics or phone screen lock")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                promptBuilder.setAllowedAuthenticators(
+                    BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                promptBuilder.setDeviceCredentialAllowed(true)
+            }
+            val promptInfo = promptBuilder.build()
+            pendingSystemAuthAction.value = onAuthenticated
+            prompt.authenticate(promptInfo)
         }
     }
 
@@ -483,15 +518,9 @@ fun OpalApp() {
                     val isSecure = DeviceSecurityHelper.isDeviceSecure(context)
                     SystemReauthDialog(
                         onDismiss = { viewModel.dismissReauthDialog() },
-                        onSuccess = { viewModel.onReauthSuccess() },
                         isSystemLockAvailable = isSecure,
                         onLaunchSystemPrompt = {
-                            val intent = DeviceSecurityHelper.createConfirmDeviceCredentialIntent(context)
-                            if (intent != null) {
-                                confirmDeviceCredentialLauncher.launch(intent)
-                            } else {
-                                viewModel.onReauthSuccess()
-                            }
+                            requestDeviceReauth { viewModel.onReauthSuccess() }
                         }
                     )
                 }
@@ -705,17 +734,21 @@ fun OpalApp() {
                         activeRulesCount = uiState.activeWebsiteRulesCount,
                         blockedTodayCount = uiState.todayBlockedWebsitesCount,
                         categories = uiState.websiteCategories,
+                        domains = uiState.blockedDomainsList,
                         onBackClick = { viewModel.closeWebsiteBlockerDashboard() },
                         onRequestVpnPermission = onRequestVpnPermission,
                         onTogglePermanentProtection = { enabled ->
                             if (enabled && !uiState.hasVpnPermission) {
                                 onRequestVpnPermission()
+                            } else if (!enabled) {
+                                requestDeviceReauth { viewModel.togglePermanentWebsiteProtection(false) }
                             } else {
-                                viewModel.togglePermanentWebsiteProtection(enabled)
+                                viewModel.togglePermanentWebsiteProtection(true)
                             }
                         },
                         onToggleCategory = { catId, enabled ->
                             viewModel.toggleWebsiteCategory(catId, enabled)
+                            if (catId == "Entertainment") viewModel.toggleWebsiteCategory("Video Streaming", enabled)
                         },
                         onOpenCategorySelection = { viewModel.openWebsiteSelectionScreen() },
                         onOpenCustomBlocklist = { viewModel.openCustomBlocklistScreen() },
@@ -731,16 +764,28 @@ fun OpalApp() {
                         domains = uiState.blockedDomainsList,
                         onBackClick = { viewModel.closeWebsiteSelectionScreen() },
                         onToggleDomainEnabled = { domain, enabled ->
-                            viewModel.toggleWebsiteDomain(domain, enabled)
+                            val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
+                            if (item?.isPermanent == true && !enabled) {
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
+                            } else {
+                                viewModel.toggleWebsiteDomain(domain, enabled)
+                            }
                         },
                         onToggleDomainFavorite = { domain, fav ->
                             viewModel.toggleWebsiteFavorite(domain, fav)
                         },
                         onToggleCategoryEnabled = { catId, enabled ->
                             viewModel.toggleWebsiteCategory(catId, enabled)
+                            if (catId == "Entertainment") viewModel.toggleWebsiteCategory("Video Streaming", enabled)
                         },
                         onAddCustomDomain = { domain, categoryId ->
                             viewModel.addCustomWebsiteDomain(domain, categoryId)
+                        },
+                        onAddCustomCategory = { name, description ->
+                            viewModel.addCustomWebsiteCategory(name, description)
                         }
                     )
                 }
@@ -750,17 +795,37 @@ fun OpalApp() {
                     CustomBlocklistScreen(
                         customDomains = uiState.blockedDomainsList.filter { it.isCustom },
                         onBackClick = { viewModel.closeCustomBlocklistScreen() },
-                        onAddDomain = { domain, isPermanent ->
-                            viewModel.addCustomWebsiteDomain(domain, "Custom Websites", isPermanent)
+                        onAddDomain = { domain, isPermanent, durationMillis ->
+                            viewModel.addCustomWebsiteDomain(domain, "Custom Websites", isPermanent, durationMillis)
                         },
                         onDeleteDomain = { domain ->
-                            viewModel.deleteCustomWebsiteDomain(domain)
+                            val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
+                            if (item?.isPermanent == true) {
+                                requestDeviceReauth { viewModel.deleteCustomWebsiteDomain(domain) }
+                            } else {
+                                viewModel.deleteCustomWebsiteDomain(domain)
+                            }
                         },
                         onTogglePermanent = { domain, isPermanent ->
-                            viewModel.toggleWebsitePermanent(domain, isPermanent)
+                            if (!isPermanent) {
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
+                            } else {
+                                viewModel.toggleWebsitePermanent(domain, true)
+                            }
                         },
                         onToggleEnabled = { domain, isBlocked ->
-                            viewModel.toggleWebsiteDomain(domain, isBlocked)
+                            val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
+                            if (item?.isPermanent == true && !isBlocked) {
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
+                            } else {
+                                viewModel.toggleWebsiteDomain(domain, isBlocked)
+                            }
                         }
                     )
                 }
@@ -770,9 +835,10 @@ fun OpalApp() {
                     BlockingScheduleScreen(
                         schedules = uiState.blockingSchedulesList,
                         onBackClick = { viewModel.closeBlockingScheduleScreen() },
-                        onAddSchedule = { title, startH, startM, endH, endM, days, _ ->
+                        categories = uiState.websiteCategories,
+                        onAddSchedule = { title, startH, startM, endH, endM, days, selectedCategories, startDate, endDate ->
                             val daysStr = days.joinToString(",")
-                            viewModel.addBlockingSchedule(title, startH, startM, endH, endM, daysStr)
+                            viewModel.addBlockingSchedule(title, startH, startM, endH, endM, daysStr, selectedCategories, startDate, endDate)
                         },
                         onToggleSchedule = { scheduleId, isEnabled ->
                             viewModel.toggleBlockingSchedule(scheduleId, isEnabled)
@@ -798,5 +864,14 @@ fun OpalApp() {
                 }
             }
         }
+    }
+}
+
+private fun Context.findFragmentActivity(): FragmentActivity? {
+    var current: Context = this
+    while (true) {
+        if (current is FragmentActivity) return current
+        if (current !is ContextWrapper) return null
+        current = current.baseContext
     }
 }

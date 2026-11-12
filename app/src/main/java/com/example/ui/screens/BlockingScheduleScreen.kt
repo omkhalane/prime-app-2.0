@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -55,12 +57,14 @@ import com.example.ui.theme.PrimeTextPrimary
 import com.example.ui.theme.PrimeTextSecondary
 import com.example.ui.theme.PrimeTextTertiary
 import com.example.vpn.db.BlockingScheduleEntity
+import com.example.vpn.db.CategoryEntity
 
 @Composable
 fun BlockingScheduleScreen(
     schedules: List<BlockingScheduleEntity>,
     onBackClick: () -> Unit,
-    onAddSchedule: (title: String, startH: Int, startM: Int, endH: Int, endM: Int, days: Set<Int>, categories: Set<String>) -> Unit,
+    onAddSchedule: (title: String, startH: Int, startM: Int, endH: Int, endM: Int, days: Set<Int>, categories: Set<String>, startDateIso: String?, endDateIso: String?) -> Unit,
+    categories: List<CategoryEntity> = emptyList(),
     onToggleSchedule: (String, Boolean) -> Unit,
     onDeleteSchedule: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -233,6 +237,10 @@ fun BlockingScheduleScreen(
                             }
                         }
 
+                        if (schedule.startDateIso != null || schedule.endDateIso != null) {
+                            Spacer(Modifier.height(6.dp))
+                            Text("Dates: ${schedule.startDateIso ?: "Any"} – ${schedule.endDateIso ?: "Any"}", color = PrimeTextTertiary, fontSize = 11.sp)
+                        }
                         if (schedule.blockedCategoriesCsv.isNotBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
@@ -283,8 +291,12 @@ fun BlockingScheduleScreen(
         var startM by remember { mutableStateOf(0) }
         var endH by remember { mutableStateOf(17) }
         var endM by remember { mutableStateOf(0) }
+        var startTimeText by remember { mutableStateOf("09:00") }
+        var endTimeText by remember { mutableStateOf("17:00") }
         var selectedDays by remember { mutableStateOf(setOf(1, 2, 3, 4, 5)) } // Weekdays (Mon-Fri)
         var selectedCats by remember { mutableStateOf(setOf("Social Media", "Video Streaming", "Entertainment")) }
+        var startDateIso by remember { mutableStateOf("") }
+        var endDateIso by remember { mutableStateOf("") }
 
         androidx.compose.ui.window.Dialog(onDismissRequest = { isAddDialogOpen = false }) {
             Box(
@@ -295,7 +307,7 @@ fun BlockingScheduleScreen(
                     .border(BorderStroke(1.dp, Color(0xFF262626)), RoundedCornerShape(22.dp))
                     .padding(20.dp)
             ) {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text(
                         text = "Create Blocking Schedule",
                         color = PrimeTextPrimary,
@@ -323,7 +335,24 @@ fun BlockingScheduleScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Text("Active Weekdays", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Text("Date range (optional, yyyy-MM-dd)", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = startDateIso, onValueChange = { startDateIso = it.take(10) }, label = { Text("From date") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = endDateIso, onValueChange = { endDateIso = it.take(10) }, label = { Text("To date") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(12.dp))
+
+                    Text("Repeat", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("Every day" to (0..6).toSet(), "Weekdays" to (1..5).toSet(), "Weekends" to setOf(0, 6)).forEach { (label, days) ->
+                            Text(label, color = if (selectedDays == days) Color.Black else PrimeTextPrimary, fontSize = 10.sp,
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).background(if (selectedDays == days) PrimeAccent else Color(0xFF222222))
+                                    .clickable { selectedDays = days }.padding(vertical = 9.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Or choose days", color = PrimeTextSecondary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(6.dp))
                     val dayLabels = listOf("S", "M", "T", "W", "T", "F", "S")
                     Row(
@@ -354,8 +383,22 @@ fun BlockingScheduleScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    Spacer(Modifier.height(12.dp))
+                    Text("Blocked categories", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    (categories.map { it.name }.ifEmpty { selectedCats.toList() }).forEach { categoryName ->
+                        Row(Modifier.fillMaxWidth().clickable { selectedCats = if (categoryName in selectedCats) selectedCats - categoryName else selectedCats + categoryName }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Switch(checked = categoryName in selectedCats, onCheckedChange = { checked -> selectedCats = if (checked) selectedCats + categoryName else selectedCats - categoryName })
+                            Spacer(Modifier.width(8.dp))
+                            Text(categoryName, color = PrimeTextPrimary, fontSize = 13.sp)
+                        }
+                    }
+
+                    OutlinedTextField(value = startTimeText, onValueChange = { startTimeText = it.take(5) }, label = { Text("Start time (HH:mm)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(value = endTimeText, onValueChange = { endTimeText = it.take(5) }, label = { Text("End time (HH:mm)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Text(
-                        text = "Time Window: ${String.format("%02d:%02d", startH, startM)} – ${String.format("%02d:%02d", endH, endM)}",
+                        text = "Time Window: $startTimeText – $endTimeText",
                         color = PrimeAccent,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
@@ -386,8 +429,15 @@ fun BlockingScheduleScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(PrimeAccent)
                                 .clickable {
-                                    onAddSchedule(scheduleTitle, startH, startM, endH, endM, selectedDays, selectedCats)
-                                    isAddDialogOpen = false
+                                    val startParts = startTimeText.split(":").mapNotNull { it.toIntOrNull() }
+                                    val endParts = endTimeText.split(":").mapNotNull { it.toIntOrNull() }
+                                    val dateFormatOk = (startDateIso.isBlank() || startDateIso.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) &&
+                                        (endDateIso.isBlank() || endDateIso.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) &&
+                                        (startDateIso.isBlank() || endDateIso.isBlank() || startDateIso <= endDateIso)
+                                    if (startParts.size == 2 && endParts.size == 2 && startParts[0] in 0..23 && endParts[0] in 0..23 && startParts[1] in 0..59 && endParts[1] in 0..59 && selectedDays.isNotEmpty() && dateFormatOk) {
+                                        onAddSchedule(scheduleTitle, startParts[0], startParts[1], endParts[0], endParts[1], selectedDays, selectedCats, startDateIso.ifBlank { null }, endDateIso.ifBlank { null })
+                                        isAddDialogOpen = false
+                                    }
                                 },
                             contentAlignment = Alignment.Center
                         ) {

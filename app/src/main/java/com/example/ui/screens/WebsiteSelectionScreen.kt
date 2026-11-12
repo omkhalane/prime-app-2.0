@@ -68,11 +68,13 @@ fun WebsiteSelectionScreen(
     onToggleDomainFavorite: (String, Boolean) -> Unit,
     onToggleCategoryEnabled: (String, Boolean) -> Unit,
     onAddCustomDomain: (String, String) -> Unit,
+    onAddCustomCategory: (String, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf<String?>(null) } // null = All
     var isAddDomainDialogOpen by remember { mutableStateOf(false) }
+    var isAddCategoryDialogOpen by remember { mutableStateOf(false) }
 
     BackHandler {
         onBackClick()
@@ -171,6 +173,16 @@ fun WebsiteSelectionScreen(
         )
 
         Spacer(modifier = Modifier.height(14.dp))
+
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Text(
+                "+ Create category",
+                color = PrimeAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { isAddCategoryDialogOpen = true }.padding(vertical = 8.dp)
+            )
+        }
 
         // Category Filter Chips Carousel
         LazyRow(
@@ -305,7 +317,7 @@ fun WebsiteSelectionScreen(
                                     fontWeight = FontWeight.Medium
                                 )
                                 Text(
-                                    text = domainItem.category + if (domainItem.isPermanent) " • Permanent" else "",
+                                    text = domainItem.category + when { domainItem.isPermanent -> " • Permanent"; domainItem.expiresAtMillis > 0L && domainItem.expiresAtMillis <= System.currentTimeMillis() -> " • Expired"; domainItem.expiresAtMillis > 0L -> " • Expires in ${((domainItem.expiresAtMillis - System.currentTimeMillis()) / 3_600_000L).coerceAtLeast(1L)}h"; else -> " • No expiry" },
                                     color = PrimeTextTertiary,
                                     fontSize = 11.sp
                                 )
@@ -313,7 +325,7 @@ fun WebsiteSelectionScreen(
                         }
 
                         Switch(
-                            checked = domainItem.isEnabled,
+                            checked = domainItem.isEnabled && (domainItem.expiresAtMillis == 0L || domainItem.expiresAtMillis > System.currentTimeMillis()),
                             onCheckedChange = { onToggleDomainEnabled(domainItem.domain, it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.Black,
@@ -345,6 +357,28 @@ fun WebsiteSelectionScreen(
 
             item {
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
+    if (isAddCategoryDialogOpen) {
+        var categoryName by remember { mutableStateOf("") }
+        var categoryDescription by remember { mutableStateOf("") }
+        androidx.compose.ui.window.Dialog(onDismissRequest = { isAddCategoryDialogOpen = false }) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color(0xFF141414)).padding(20.dp)) {
+                Text("Create custom category", color = PrimeTextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(value = categoryName, onValueChange = { categoryName = it }, label = { Text("Category name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = categoryDescription, onValueChange = { categoryDescription = it }, label = { Text("Description (optional)") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(14.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Cancel", color = PrimeTextSecondary, modifier = Modifier.weight(1f).clickable { isAddCategoryDialogOpen = false }.padding(12.dp))
+                    Text("Create", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(PrimeAccent).clickable(enabled = categoryName.isNotBlank()) {
+                        onAddCustomCategory(categoryName.trim(), categoryDescription.trim())
+                        isAddCategoryDialogOpen = false
+                    }.padding(12.dp))
+                }
             }
         }
     }
@@ -397,7 +431,18 @@ fun WebsiteSelectionScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Category", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    categories.forEach { category ->
+                        Text(
+                            text = (if (selectedCat == category.name) "✓ " else "") + category.name,
+                            color = if (selectedCat == category.name) PrimeAccent else PrimeTextPrimary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedCat = category.name }.padding(vertical = 5.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

@@ -31,13 +31,13 @@ interface BlockedWebsiteDao {
     @Query("DELETE FROM blocked_domains WHERE domain = :domain")
     suspend fun deleteDomain(domain: String)
 
-    @Query("UPDATE blocked_domains SET isEnabled = :isEnabled WHERE domain = :domain")
-    suspend fun updateDomainEnabled(domain: String, isEnabled: Boolean)
+    @Query("UPDATE blocked_domains SET isEnabled = :isEnabled, expiresAtMillis = CASE WHEN :isEnabled = 1 AND expiresAtMillis > 0 AND expiresAtMillis <= :now THEN :renewedUntil ELSE expiresAtMillis END WHERE domain = :domain")
+    suspend fun updateDomainEnabled(domain: String, isEnabled: Boolean, now: Long, renewedUntil: Long)
 
     @Query("UPDATE blocked_domains SET isFavorite = :isFavorite WHERE domain = :domain")
     suspend fun updateDomainFavorite(domain: String, isFavorite: Boolean)
 
-    @Query("UPDATE blocked_domains SET isPermanent = :isPermanent WHERE domain = :domain")
+    @Query("UPDATE blocked_domains SET isPermanent = :isPermanent, expiresAtMillis = CASE WHEN :isPermanent = 1 THEN 0 ELSE expiresAtMillis END WHERE domain = :domain")
     suspend fun updateDomainPermanent(domain: String, isPermanent: Boolean)
 
     @Query("SELECT COUNT(*) FROM blocked_domains")
@@ -67,6 +67,9 @@ interface WebsiteCategoryDao {
 
     @Query("DELETE FROM website_categories WHERE name = :name AND isCustom = 1")
     suspend fun deleteCustomCategory(name: String)
+
+    @Query("SELECT * FROM website_categories WHERE name = :name LIMIT 1")
+    suspend fun getCategoryByName(name: String): CategoryEntity?
 
     @Query("SELECT COUNT(*) FROM website_categories")
     suspend fun getCategoryCount(): Int

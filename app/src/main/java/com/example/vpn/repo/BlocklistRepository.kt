@@ -27,8 +27,8 @@ class BlocklistRepository(
     }
 
     private suspend fun seedInitialDataIfEmpty() = withContext(Dispatchers.IO) {
-        if (categoryDao.getCategoryCount() == 0) {
-            categoryDao.insertCategories(StarterWebsiteBlocklist.STARTER_CATEGORIES)
+        StarterWebsiteBlocklist.STARTER_CATEGORIES.forEach { category ->
+            if (categoryDao.getCategoryByName(category.name) == null) categoryDao.insertCategory(category)
         }
         if (domainDao.getDomainCount() == 0) {
             domainDao.insertDomains(StarterWebsiteBlocklist.STARTER_DOMAINS)
@@ -48,7 +48,8 @@ class BlocklistRepository(
     suspend fun addCustomDomain(
         rawDomain: String,
         category: String = "Custom Websites",
-        isPermanent: Boolean = false
+        isPermanent: Boolean = false,
+        durationMillis: Long = 24L * 60L * 60L * 1000L
     ): Boolean = withContext(Dispatchers.IO) {
         val norm = DomainMatcher.normalize(rawDomain)
         if (norm.isEmpty() || !norm.contains('.')) return@withContext false
@@ -59,7 +60,8 @@ class BlocklistRepository(
             isCustom = true,
             isEnabled = true,
             isFavorite = true,
-            isPermanent = isPermanent
+            isPermanent = isPermanent,
+            expiresAtMillis = if (isPermanent || durationMillis <= 0L) 0L else System.currentTimeMillis() + durationMillis
         )
         domainDao.insertDomain(entity)
         true
@@ -70,7 +72,8 @@ class BlocklistRepository(
     }
 
     suspend fun toggleDomainEnabled(domain: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
-        domainDao.updateDomainEnabled(DomainMatcher.normalize(domain), isEnabled)
+        val now = System.currentTimeMillis()
+        domainDao.updateDomainEnabled(DomainMatcher.normalize(domain), isEnabled, now, now + 24L * 60L * 60L * 1000L)
     }
 
     suspend fun toggleDomainFavorite(domain: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
@@ -86,6 +89,8 @@ class BlocklistRepository(
     }
 
     suspend fun addCustomCategory(name: String, description: String, colorHex: Long) = withContext(Dispatchers.IO) {
+        require(name.isNotBlank())
+        require(categoryDao.getCategoryByName(name.trim()) == null) { "A category with this name already exists" }
         val cat = CategoryEntity(
             name = name.trim(),
             description = description.trim(),
@@ -125,8 +130,9 @@ class BlocklistRepository(
             val isCatActive = activeCategories.contains(domainEntity.category)
             val isSessionExplicit = sessionDomains.contains(domainEntity.domain)
             val isPermanent = domainEntity.isPermanent
+            val isNotExpired = domainEntity.expiresAtMillis == 0L || domainEntity.expiresAtMillis > System.currentTimeMillis()
 
-            if (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive)) {
+            if (isNotExpired && (isPermanent || isSessionExplicit || (domainEntity.isEnabled && isCatActive))) {
                 resultMap[domainEntity.domain] = domainEntity.category
             }
         }
