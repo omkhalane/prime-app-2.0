@@ -1655,8 +1655,17 @@ class OpalViewModel(
 
     fun addCustomWebsiteDomain(domain: String, categoryId: String = "Custom Websites", permanent: Boolean = false, durationMillis: Long = 24L * 60L * 60L * 1000L) {
         viewModelScope.launch {
-            blockingManager?.blocklistRepo?.addCustomDomain(domain, categoryId, permanent, durationMillis)
-            blockingManager?.reconcileActiveRules()
+            val manager = blockingManager
+            if (manager == null) {
+                _uiState.update { it.copy(snackbarMessage = "Website protection is unavailable") }
+                return@launch
+            }
+            val added = manager.blocklistRepo.addCustomDomain(domain, categoryId, permanent, durationMillis)
+            if (!added) {
+                _uiState.update { it.copy(snackbarMessage = "Enter a valid domain and a positive duration") }
+                return@launch
+            }
+            manager.reconcileActiveRules()
             _uiState.update { it.copy(snackbarMessage = "Added $domain to blocklist") }
         }
     }
@@ -1664,8 +1673,9 @@ class OpalViewModel(
     fun addCustomWebsiteCategory(name: String, description: String) {
         viewModelScope.launch {
             runCatching {
-                blockingManager?.blocklistRepo?.addCustomCategory(name, description, 0xFF00E5A0)
-                blockingManager?.reconcileActiveRules()
+                val manager = blockingManager ?: error("Website protection is unavailable")
+                manager.blocklistRepo.addCustomCategory(name, description, 0xFF00E5A0)
+                manager.reconcileActiveRules()
             }.onSuccess {
                 _uiState.update { it.copy(snackbarMessage = "Category created") }
             }.onFailure { error ->
@@ -1696,7 +1706,8 @@ class OpalViewModel(
         viewModelScope.launch {
             val days = daysOfWeek.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
             runCatching {
-                blockingManager?.scheduleRepo?.addSchedule(
+                val manager = blockingManager ?: error("Website protection is unavailable")
+                manager.scheduleRepo.addSchedule(
                     title = title,
                     startHour = startHour,
                     startMinute = startMinute,
@@ -1707,7 +1718,7 @@ class OpalViewModel(
                     startDateIso = startDateIso,
                     endDateIso = endDateIso
                 )
-                blockingManager?.reconcileActiveRules()
+                manager.reconcileActiveRules()
             }.onSuccess {
                 _uiState.update { it.copy(snackbarMessage = "Schedule '$title' created") }
             }.onFailure { error ->
