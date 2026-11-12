@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.text.ParsePosition
 
 class BlockingScheduleRepository(
     private val context: Context,
@@ -96,7 +97,9 @@ class BlockingScheduleRepository(
 
     private fun isValidDate(value: String): Boolean = try {
         val format = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false }
-        format.parse(value) != null
+        val position = ParsePosition(0)
+        val parsed = format.parse(value, position)
+        parsed != null && position.index == value.length
     } catch (_: Exception) {
         false
     }
