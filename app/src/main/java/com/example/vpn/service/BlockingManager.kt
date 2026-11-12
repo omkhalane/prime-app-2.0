@@ -58,6 +58,7 @@ class BlockingManager private constructor(private val context: Context) {
     private val sessionBlockedCategories = (prefs.getStringSet("focus_session_categories", emptySet()) ?: emptySet()).toMutableSet()
 
     init {
+        BlockingRecoveryManager.enqueuePeriodicReconciliation(context)
         scope.launch {
             reconcileActiveRules()
             while (isActive) {
