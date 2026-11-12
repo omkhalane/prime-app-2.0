@@ -77,7 +77,7 @@ class DnsFilterEngine(private val socketProtector: (DatagramSocket) -> Boolean =
             return DnsFilterResult.Blocked(DnsPacketBuilder.buildBlockedResponse(query, blockingStrategy), domain, category, reason)
         }
 
-        val cacheKey = "${domain}_${query.qtype}_${query.qclass}"
+        val cacheKey = buildCacheKey(dnsPayload)
         val now = System.currentTimeMillis()
         val cached = dnsCache[cacheKey]
         if (cached != null && cached.expiresAt > now) {
@@ -97,6 +97,20 @@ class DnsFilterEngine(private val socketProtector: (DatagramSocket) -> Boolean =
             return DnsFilterResult.Allowed(response, domain)
         }
         return DnsFilterResult.Allowed(DnsPacketBuilder.buildHeaderWithRCode(query, DnsPacketBuilder.RCODE_SERVFAIL), domain)
+    }
+
+    /**
+     * Cache only equivalent wire queries. Domain/type/class alone is insufficient:
+     * clients may vary case randomization, recursion/CD flags, or EDNS options.
+     * Transaction IDs are the sole field rewritten on cache hits.
+     */
+    private fun buildCacheKey(queryPayload: ByteArray): String {
+        val normalized = queryPayload.clone()
+        if (normalized.size >= 2) {
+            normalized[0] = 0
+            normalized[1] = 0
+        }
+        return normalized.joinToString("") { byte -> "%02x".format(byte.toInt() and 0xFF) }
     }
 
     private fun cacheResponse(key: String, response: ByteArray, ttlSeconds: Long) {
