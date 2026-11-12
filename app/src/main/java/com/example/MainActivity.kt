@@ -408,7 +408,8 @@ fun OpalApp() {
                             onRetryFetch = { viewModel.refreshWellbeingData() },
                             onOpenDailyDashboard = { viewModel.openDailyDashboard() },
                             onOpenWeeklyReport = { viewModel.openWeeklyReport() },
-                            onAppClick = { viewModel.openAppSpecificReport(it) }
+                            onAppClick = { viewModel.openAppSpecificReport(it) },
+                            showBackButton = false
                         )
                     }
                     NavigationTab.PROFILE -> {
@@ -417,7 +418,8 @@ fun OpalApp() {
                             onBackClick = { viewModel.selectTab(NavigationTab.HOME) },
                             onTryProClick = { viewModel.upgradeToPro() },
                             onUseEmergencyPass = { viewModel.useEmergencyPass() },
-                            onReplayOnboarding = { viewModel.startOnboarding() }
+                            onReplayOnboarding = { viewModel.startOnboarding() },
+                            showBackButton = false
                         )
                     }
                 }
