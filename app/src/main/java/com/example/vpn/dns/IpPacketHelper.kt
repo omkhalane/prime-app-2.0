@@ -81,9 +81,12 @@ object IpPacketHelper {
         destPort: Int,
         udpPayload: ByteArray
     ): ByteArray {
+        require(sourceIp.size == 4 && destIp.size == 4) { "IPv4 addresses must be 4 bytes" }
+        require(sourcePort in 0..65535 && destPort in 0..65535) { "UDP ports must be unsigned 16-bit values" }
         val ipHeaderLength = 20
         val udpHeaderLength = 8
         val totalLength = ipHeaderLength + udpHeaderLength + udpPayload.size
+        require(totalLength <= 0xFFFF) { "IPv4 packet is too large" }
         val packet = ByteArray(totalLength)
         val buffer = ByteBuffer.wrap(packet)
 
@@ -119,7 +122,7 @@ object IpPacketHelper {
 
     /** Parses a basic IPv6 UDP packet. Extension-header chains are deliberately rejected. */
     fun parseIpv6Udp(packet: ByteArray, length: Int): ParsedUdpPacket? {
-        if (length < 48 || ((packet[0].toInt() ushr 4) and 0x0F) != 6) return null
+        if (length < 48 || length > packet.size || ((packet[0].toInt() ushr 4) and 0x0F) != 6) return null
         val buffer = ByteBuffer.wrap(packet, 0, length)
         val payloadLength = buffer.getShort(4).toInt() and 0xFFFF
         if ((buffer.get(6).toInt() and 0xFF) != PROTOCOL_UDP.toInt()) return null
@@ -144,6 +147,7 @@ object IpPacketHelper {
     fun buildIpv6UdpPacket(sourceIp: ByteArray, destIp: ByteArray, sourcePort: Int,
                            destPort: Int, udpPayload: ByteArray): ByteArray {
         require(sourceIp.size == 16 && destIp.size == 16) { "IPv6 addresses must be 16 bytes" }
+        require(sourcePort in 0..65535 && destPort in 0..65535) { "UDP ports must be unsigned 16-bit values" }
         val udpLength = 8 + udpPayload.size
         require(udpLength <= 0xFFFF) { "UDP payload is too large" }
         val packet = ByteArray(40 + udpLength)
