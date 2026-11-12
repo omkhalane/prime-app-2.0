@@ -120,6 +120,13 @@ fun MyAppsScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Build rules that protect your attention.",
+            color = PrimeTextSecondary,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        )
         Spacer(modifier = Modifier.height(24.dp))
 
         // Blocked section header
@@ -215,7 +222,7 @@ fun MyAppsScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Shields",
+                    text = "Your shields",
                     color = PrimeTextPrimary,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
