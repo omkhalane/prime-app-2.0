@@ -78,3 +78,6 @@ jobs:
 
       - name: Run JVM and Robolectric tests
         run: gradle --no-daemon :app:testDebugUnitTest --stacktrace
+
+      - name: Run Android lint
+        run: gradle --no-daemon :app:lintDebug --stacktrace
