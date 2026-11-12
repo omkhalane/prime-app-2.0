@@ -142,7 +142,7 @@ class OpalRepository(
     private val prefs: SharedPreferences? = context?.getSharedPreferences("prime_focus_prefs", Context.MODE_PRIVATE)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Temporary timer-session targets must survive normal dashboard refreshes.
-    private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
+    @Volatile private var timerSessionBlockedPackages: Set<String> = prefs?.getStringSet("timer_session_blocked_packages", emptySet())?.toSet() ?: emptySet()
 
     // Initial default rules (can be edited/saved by user)
     private val defaultRules = listOf(
