@@ -1,5 +1,6 @@
 package com.example.vpn.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -13,7 +14,7 @@ data class BlockedDomainEntity(
     val isPermanent: Boolean = false,
     val addedAt: Long = System.currentTimeMillis(),
     /** 0 means no expiry; otherwise this is an absolute epoch-millis deadline. */
-    val expiresAtMillis: Long = 0L
+    @ColumnInfo(defaultValue = "0") val expiresAtMillis: Long = 0L
 )
 
 @Entity(tableName = "website_categories")
