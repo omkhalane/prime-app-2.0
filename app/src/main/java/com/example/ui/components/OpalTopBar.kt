@@ -145,7 +145,7 @@ fun OpalTopBar(
                     .scale(profileScale)
                     .clip(CircleShape)
                     .background(PrimeGlassCardBg)
-                    .border(BorderStroke(1.dp, PrimeGlassBorder), CircleShape
+                    .border(BorderStroke(1.dp, PrimeGlassBorder), CircleShape)
                     .clickable(
                         interactionSource = profileInteraction,
                         indication = null,
