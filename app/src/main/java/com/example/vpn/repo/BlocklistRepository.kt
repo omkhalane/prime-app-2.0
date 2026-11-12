@@ -72,7 +72,8 @@ class BlocklistRepository(
     }
 
     suspend fun toggleDomainEnabled(domain: String, isEnabled: Boolean) = withContext(Dispatchers.IO) {
-        domainDao.updateDomainEnabled(DomainMatcher.normalize(domain), isEnabled)
+        val now = System.currentTimeMillis()
+        domainDao.updateDomainEnabled(DomainMatcher.normalize(domain), isEnabled, now, now + 24L * 60L * 60L * 1000L)
     }
 
     suspend fun toggleDomainFavorite(domain: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
