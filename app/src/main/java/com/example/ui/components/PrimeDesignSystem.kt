@@ -190,3 +190,46 @@ fun PrimeStatusPill(
         Text(text, color = color, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
+
+@Composable
+fun PrimeBackHeader(
+    title: String,
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        PrimeGlassIconButton(
+            icon = androidx.compose.material.icons.Icons.AutoMirrored.Rounded.ArrowBack,
+            contentDescription = "Back",
+            onClick = onBackClick,
+            containerSize = 44.dp,
+            iconSize = 20.dp
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = PrimeTextPrimary,
+                fontSize = 20.sp,
+                lineHeight = 25.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = (-0.25).sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, color = PrimeTextTertiary, fontSize = 12.sp, lineHeight = 16.sp)
+            }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(10.dp))
+            trailing()
+        }
+    }
+}
