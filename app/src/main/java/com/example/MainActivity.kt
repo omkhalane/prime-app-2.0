@@ -757,6 +757,7 @@ fun OpalApp() {
                         },
                         onToggleCategoryEnabled = { catId, enabled ->
                             viewModel.toggleWebsiteCategory(catId, enabled)
+                            if (catId == "Entertainment") viewModel.toggleWebsiteCategory("Video Streaming", enabled)
                         },
                         onAddCustomDomain = { domain, categoryId ->
                             viewModel.addCustomWebsiteDomain(domain, categoryId)
