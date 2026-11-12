@@ -140,6 +140,18 @@ fun WebsiteBlockerDashboard(
                 }
             }
         }
+        categories.filter { it.isCustom }.forEach { category ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(PrimeGlassCardBg).padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(9.dp).clip(CircleShape).background(Color(category.colorHex)))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(category.name, color = PrimeTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text("${category.domainCount} domains", color = PrimeTextTertiary, fontSize = 11.sp)
+                }
+                Switch(checked = category.isEnabled, onCheckedChange = { onToggleCategory(category.name, it) },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = PrimeAccent, uncheckedThumbColor = PrimeTextSecondary, uncheckedTrackColor = PrimeSurfaceHigher))
+            }
+        }
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(PrimeGlassCardBg).clickable(onClick = onOpenCategorySelection).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Plus, null, tint = PrimeAccent)
             Spacer(Modifier.width(12.dp))
