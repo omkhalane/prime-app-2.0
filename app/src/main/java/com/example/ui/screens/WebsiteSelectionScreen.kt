@@ -431,7 +431,18 @@ fun WebsiteSelectionScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Category", color = PrimeTextSecondary, fontSize = 12.sp)
+                    Spacer(Modifier.height(6.dp))
+                    categories.forEach { category ->
+                        Text(
+                            text = (if (selectedCat == category.name) "✓ " else "") + category.name,
+                            color = if (selectedCat == category.name) PrimeAccent else PrimeTextPrimary,
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedCat = category.name }.padding(vertical = 5.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
