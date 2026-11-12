@@ -4,17 +4,10 @@ import java.nio.ByteBuffer
 import java.util.Locale
 
 data class DnsQuery(
-    val transactionId: Int,
-    val isResponse: Boolean,
-    val opcode: Int,
-    val recursionDesired: Boolean,
-    val questionCount: Int,
-    val domain: String,
-    val qtype: Int,
-    val qclass: Int,
-    val questionBytes: ByteArray,
-    val rawPacket: ByteArray,
-    val isValid: Boolean = true
+    val transactionId: Int, val isResponse: Boolean, val opcode: Int,
+    val recursionDesired: Boolean, val questionCount: Int, val domain: String,
+    val qtype: Int, val qclass: Int, val questionBytes: ByteArray,
+    val rawPacket: ByteArray, val isValid: Boolean = true
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -22,19 +15,10 @@ data class DnsQuery(
         other as DnsQuery
         return transactionId == other.transactionId && domain == other.domain && qtype == other.qtype
     }
-
-    override fun hashCode(): Int {
-        var result = transactionId
-        result = 31 * result + domain.hashCode()
-        result = 31 * result + qtype
-        return result
-    }
-
-
+    override fun hashCode(): Int = 31 * (31 * transactionId + domain.hashCode()) + qtype
 }
 
 object DnsPacketParser {
-
     const val QTYPE_A = 1
     const val QTYPE_NS = 2
     const val QTYPE_CNAME = 5
@@ -46,101 +30,74 @@ object DnsPacketParser {
     const val QTYPE_HTTPS = 65
     const val QTYPE_ANY = 255
 
-    /**
-     * Parses a raw byte array representing a DNS packet.
-     * Returns a valid DnsQuery if parsing succeeds, or null if the packet is malformed.
-     */
+    /** Parses exactly one standard DNS question and rejects malformed compression. */
     fun parseQuery(data: ByteArray): DnsQuery? {
-        if (data.size < 12) return null // Minimum DNS header is 12 bytes
-
-        try {
+        if (data.size < 17 || data.size > 4096) return null
+        return try {
             val buffer = ByteBuffer.wrap(data)
-
-            // Header (12 bytes)
             val transactionId = buffer.short.toInt() and 0xFFFF
             val flags = buffer.short.toInt() and 0xFFFF
             val isResponse = (flags and 0x8000) != 0
-            val opcode = (flags and 0x7800) shr 11
+            val opcode = (flags and 0x7800) ushr 11
             val recursionDesired = (flags and 0x0100) != 0
-
             val qdcount = buffer.short.toInt() and 0xFFFF
-            buffer.short // ancount
-            buffer.short // nscount
-            buffer.short // arcount
+            buffer.short
+            buffer.short
+            buffer.short
+            if (qdcount != 1 || opcode != 0) return null
 
-            if (qdcount < 1) return null // Must have at least 1 question
-
-            // Parse Question section
             val questionStart = buffer.position()
-            val domainBuilder = StringBuilder()
+            val labels = StringBuilder()
+            val visitedPointers = HashSet<Int>()
+            var currentPos = questionStart
             var jumped = false
-            var currentPos = buffer.position()
-
-            // Read QNAME (sequence of length-prefixed labels ending with 0)
-            while (currentPos < data.size) {
-                val len = data[currentPos].toInt() and 0xFF
-                if (len == 0) {
+            var pointerHops = 0
+            var expandedNameLength = 0
+            while (true) {
+                if (currentPos !in data.indices) return null
+                val length = data[currentPos].toInt() and 0xFF
+                if (length == 0) {
                     currentPos++
                     break
                 }
-
-                // Check for DNS compression pointer (top 2 bits set: 0xC0)
-                if ((len and 0xC0) == 0xC0) {
-                    if (currentPos + 1 >= data.size) return null
-                    val offset = ((len and 0x3F) shl 8) or (data[currentPos + 1].toInt() and 0xFF)
-                    if (!jumped) {
-                        buffer.position(currentPos + 2)
-                        jumped = true
+                when (length and 0xC0) {
+                    0xC0 -> {
+                        if (currentPos + 1 >= data.size) return null
+                        val pointer = ((length and 0x3F) shl 8) or (data[currentPos + 1].toInt() and 0xFF)
+                        if (pointer !in 12 until data.size || !visitedPointers.add(pointer)) return null
+                        if (++pointerHops > 16) return null
+                        if (!jumped) {
+                            buffer.position(currentPos + 2)
+                            jumped = true
+                        }
+                        currentPos = pointer
                     }
-                    currentPos = offset
-                    continue
+                    0x00 -> {
+                        if (length > 63 || currentPos + 1 + length > data.size) return null
+                        currentPos++
+                        if (labels.isNotEmpty()) labels.append('.')
+                        val label = String(data, currentPos, length, Charsets.US_ASCII)
+                        if (label.any { it.code !in 0x21..0x7E || it == '.' }) return null
+                        labels.append(label)
+                        expandedNameLength += length + 1
+                        if (expandedNameLength > 255) return null
+                        currentPos += length
+                    }
+                    else -> return null
                 }
-
-                currentPos++
-                if (currentPos + len > data.size) return null
-
-                val labelBytes = ByteArray(len)
-                System.arraycopy(data, currentPos, labelBytes, 0, len)
-                currentPos += len
-
-                if (domainBuilder.isNotEmpty()) {
-                    domainBuilder.append('.')
-                }
-                domainBuilder.append(String(labelBytes, Charsets.US_ASCII))
             }
-
-            if (!jumped) {
-                buffer.position(currentPos)
-            }
-
+            if (!jumped) buffer.position(currentPos)
             if (buffer.remaining() < 4) return null
             val qtype = buffer.short.toInt() and 0xFFFF
             val qclass = buffer.short.toInt() and 0xFFFF
-            val questionEnd = buffer.position()
-
-            val questionLength = questionEnd - questionStart
-            val questionBytes = ByteArray(questionLength)
-            System.arraycopy(data, questionStart, questionBytes, 0, questionLength)
-
-            val domain = domainBuilder.toString().lowercase(Locale.ROOT)
-
-            return DnsQuery(
-                transactionId = transactionId,
-                isResponse = isResponse,
-                opcode = opcode,
-                recursionDesired = recursionDesired,
-                questionCount = qdcount,
-                domain = domain,
-                qtype = qtype,
-                qclass = qclass,
-                questionBytes = questionBytes,
-                rawPacket = data,
-                isValid = true
-            )
-        } catch (_: Exception) {
-            return null
-        }
+            val questionBytes = data.copyOfRange(questionStart, buffer.position())
+            val domain = labels.toString().lowercase(Locale.ROOT)
+            if (domain.isBlank() || domain.length > 253) return null
+            DnsQuery(transactionId, isResponse, opcode, recursionDesired, qdcount,
+                domain, qtype, qclass, questionBytes, data)
+        } catch (_: Exception) { null }
     }
+
     /** Minimum answer-section TTL in seconds; null means malformed or no positive answer. */
     fun minimumAnswerTtlSeconds(response: ByteArray): Long? {
         if (response.size < 12) return null
@@ -150,10 +107,15 @@ object DnsPacketParser {
         }
         fun skipName(start: Int): Int? {
             var pos = start
-            while (pos < response.size) {
+            var steps = 0
+            while (pos < response.size && steps++ <= 128) {
                 val length = response[pos].toInt() and 0xFF
                 if (length == 0) return pos + 1
-                if ((length and 0xC0) == 0xC0) return if (pos + 1 < response.size) pos + 2 else null
+                if ((length and 0xC0) == 0xC0) {
+                    if (pos + 1 >= response.size) return null
+                    val pointer = ((length and 0x3F) shl 8) or (response[pos + 1].toInt() and 0xFF)
+                    return if (pointer < response.size) pos + 2 else null
+                }
                 if ((length and 0xC0) != 0 || pos + 1 + length > response.size) return null
                 pos += 1 + length
             }
@@ -189,5 +151,4 @@ object DnsPacketParser {
             minTtl
         } catch (_: Exception) { null }
     }
-
 }
