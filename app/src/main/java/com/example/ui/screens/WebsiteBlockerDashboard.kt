@@ -135,7 +135,7 @@ fun WebsiteBlockerDashboard(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(label, color = PrimeTextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Text("${domains.count { it.category == category.name }} domains", color = PrimeTextTertiary, fontSize = 11.sp)
+                        Text("${domains.count { it.category in aliases }} domains", color = PrimeTextTertiary, fontSize = 11.sp)
                     }
                     Switch(checked = category.isEnabled, onCheckedChange = { onToggleCategory(category.name, it) },
                         colors = SwitchDefaults.colors(checkedThumbColor = Color.Black, checkedTrackColor = PrimeAccent, uncheckedThumbColor = PrimeTextSecondary, uncheckedTrackColor = PrimeSurfaceHigher))
