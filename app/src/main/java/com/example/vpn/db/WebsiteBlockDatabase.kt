@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BlockingScheduleEntity::class,
         BlockedWebsiteEventEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class WebsiteBlockDatabase : RoomDatabase() {
@@ -32,6 +32,12 @@ abstract class WebsiteBlockDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE blocked_domains ADD COLUMN previousExpiryMillis INTEGER")
+            }
+        }
+
         @Volatile private var INSTANCE: WebsiteBlockDatabase? = null
 
         fun getInstance(context: Context): WebsiteBlockDatabase {
@@ -41,7 +47,7 @@ abstract class WebsiteBlockDatabase : RoomDatabase() {
                     WebsiteBlockDatabase::class.java,
                     "prime_website_block.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance
