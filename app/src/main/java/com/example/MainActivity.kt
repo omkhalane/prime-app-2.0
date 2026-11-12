@@ -809,7 +809,7 @@ fun OpalApp() {
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true && !enabled) {
                                 requestDeviceReauth {
-                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsitePermanent(domain, false, reauthenticated = true)
                                     viewModel.toggleWebsiteDomain(domain, false)
                                 }
                             } else {
@@ -843,7 +843,7 @@ fun OpalApp() {
                         onDeleteDomain = { domain ->
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true) {
-                                requestDeviceReauth { viewModel.deleteCustomWebsiteDomain(domain) }
+                                requestDeviceReauth { viewModel.deleteCustomWebsiteDomain(domain, reauthenticated = true) }
                             } else {
                                 viewModel.deleteCustomWebsiteDomain(domain)
                             }
