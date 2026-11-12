@@ -2,6 +2,7 @@ package com.example.alarm
 
 import com.example.model.AlarmItem
 import com.example.model.AlarmRecurrence
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
 import org.junit.Test
