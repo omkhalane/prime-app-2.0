@@ -316,7 +316,7 @@ fun TimerBlockAppsSheet(
                                             Text(
                                                 text = "Shielded",
                                                 color = Color(0xFFAAAAAA),
-                                                fontSize = 10.sp,
+                                                fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
