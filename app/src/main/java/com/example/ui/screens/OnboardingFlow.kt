@@ -408,140 +408,80 @@ private fun AuthCheckStep(
     onBack: () -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 36.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         TopBackButton(onBack = onBack)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
+        Spacer(Modifier.height(20.dp))
         Image(
             painter = painterResource(id = R.drawable.prime_logo),
-            contentDescription = "Prime Gemstone",
+            contentDescription = "PRIME logo",
             modifier = Modifier.size(140.dp)
         )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
+        Spacer(Modifier.height(40.dp))
+        Text("Hi, $userName", color = OpalMint, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(18.dp))
         Text(
-            text = "Hi, $userName",
-            color = OpalMint,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Quick check, have we met before?",
+            "A fresh start, on your terms.",
             color = OpalTextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(36.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = onNext,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Yes, sign in", color = Color.White, fontSize = 14.sp)
-            }
-
-            Button(
-                onClick = onNext,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("I'm new to Prime", color = Color.White, fontSize = 14.sp)
-            }
-        }
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "You can use PRIME without creating an account. Your profile, tasks and routines are stored locally on this device.",
+            color = OpalTextSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onNext,
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
+            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) { Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
 @Composable
 private fun AuthOptionsStep(onNext: () -> Unit, onBack: () -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 36.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).padding(bottom = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         TopBackButton(onBack = onBack)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
+        Spacer(Modifier.height(20.dp))
         Image(
             painter = painterResource(id = R.drawable.prime_logo),
-            contentDescription = "Prime Gemstone",
+            contentDescription = "PRIME logo",
             modifier = Modifier.size(140.dp)
         )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
+        Spacer(Modifier.height(40.dp))
         Text(
-            text = "Let's get your journey started.",
+            "Your data stays on this device",
             color = OpalTextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(36.dp))
-
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Account sign-in and cloud sync are not available yet. You can still use your focus tools, shields, planner and wellbeing features locally.",
+            color = OpalTextSecondary,
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.weight(1f))
         Button(
             onClick = onNext,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black
-            ),
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
             shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("Continue with Google", color = Color.Black, fontWeight = FontWeight.Bold)
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = "or", color = OpalTextSecondary, fontSize = 14.sp)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("✉  Continue with email", color = Color.White, fontSize = 15.sp)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22262B)),
-            shape = RoundedCornerShape(28.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-        ) {
-            Text("📞  Continue with phone", color = Color.White, fontSize = 15.sp)
-        }
+            modifier = Modifier.fillMaxWidth().height(54.dp)
+        ) { Text("Continue on this device", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
