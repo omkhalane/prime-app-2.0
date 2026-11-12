@@ -76,6 +76,7 @@ fun SettingsScreen(
     onTryProClick: () -> Unit,
     onUseEmergencyPass: () -> Unit,
     onReplayOnboarding: () -> Unit,
+    showBackButton: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -97,24 +98,26 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF161616))
-                    .border(1.dp, Color(0x26FFFFFF), CircleShape)
-                    .clickable { onBackClick() }
-                    .testTag("settings_back_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = OpalTextPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
+            if (showBackButton) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF161616))
+                        .border(1.dp, Color(0x26FFFFFF), CircleShape)
+                        .clickable { onBackClick() }
+                        .testTag("settings_back_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = OpalTextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
             }
-            Spacer(modifier = Modifier.width(14.dp))
             Column {
                 Text(
                     text = "Your profile",
