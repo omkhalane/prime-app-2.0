@@ -940,7 +940,7 @@ private fun PermissionsIntroStep(
                         text = if (screenTimeGranted)
                             "Usage access granted in Android Settings."
                         else
-                            "Tap to enable. Lets Prime show you your daily screen time and progress.",
+                            "Reads app-usage duration on this device to show your daily screen time and progress.",
                         color = OpalTextSecondary,
                         fontSize = 13.sp
                     )
@@ -957,11 +957,17 @@ private fun PermissionsIntroStep(
             }
         }
 
+        Text(
+            text = "Optional: you can change these permissions anytime in Android Settings.",
+            color = OpalTextSecondary,
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center
+        )
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
             onClick = onNext,
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+            colors = ButtonDefaults.buttonColors(containerColor = OpalMint, contentColor = Color.Black),
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -977,7 +983,6 @@ private fun HowItWorks1Step(onNext: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .clickable { onNext() }
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
