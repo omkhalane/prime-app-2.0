@@ -141,7 +141,7 @@ fun OpalTopBar(
             // Apple-style Glass Profile Avatar Button
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .scale(profileScale)
                     .clip(CircleShape)
                     .background(PrimeGlassCardBg)
