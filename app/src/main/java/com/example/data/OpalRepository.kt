@@ -44,7 +44,7 @@ class OpalRepository(private val context: Context? = null) {
             val manual = prefs.getStringSet("blocked_app_ids", emptySet()).orEmpty()
                 .filterNot { it.startsWith("site_") }.toSet()
             val timer = prefs.getStringSet("timer_session_blocked_packages", emptySet()).orEmpty()
-            val scheduled = activeRulePackages(prefs.getString("block_rules_json", null), System.currentTimeMillis())
+            val scheduled = activeRulePackagesFromJson(prefs.getString("block_rules_json", null), System.currentTimeMillis())
             val packageTargets = scheduled.filterNot { it.startsWith("site_") }.toSet()
             val customWebsiteEntries = prefs.getStringSet("custom_websites_set", emptySet()).orEmpty()
             val savedWebsiteDomains = customWebsiteEntries.mapNotNull { entry ->
@@ -63,39 +63,62 @@ class OpalRepository(private val context: Context? = null) {
                     OpalAccessibilityService.blockedWebsites.isNotEmpty()
         }
 
-        internal fun activeRulePackages(json: String?, nowMillis: Long): Set<String> {
+        private fun activeRulePackagesFromJson(json: String?, nowMillis: Long): Set<String> {
             if (json.isNullOrBlank()) return emptySet()
+            return try {
+                val jsonRules = JSONArray(json)
+                val rules = (0 until jsonRules.length()).mapNotNull { index ->
+                    val obj = jsonRules.optJSONObject(index) ?: return@mapNotNull null
+                    val daysArray = obj.optJSONArray("active_days")
+                    val days = if (daysArray == null) setOf(0, 1, 2, 3, 4)
+                    else (0 until daysArray.length()).mapNotNull {
+                        daysArray.optInt(it, -1).takeIf { day -> day in 0..6 }
+                    }.toSet()
+                    val appsArray = obj.optJSONArray("blocked_apps")
+                    val apps = if (appsArray == null) emptyList() else
+                        (0 until appsArray.length()).map { appsArray.optString(it) }.filter { it.isNotBlank() }
+                    BlockRule(
+                        id = obj.optString("id", "saved_rule_$index"),
+                        title = obj.optString("title", "Shield"),
+                        startsInText = obj.optString("starts_in", "Active"),
+                        fromTime = obj.optString("from_time", "9:00 am"),
+                        toTime = obj.optString("to_time", "5:00 pm"),
+                        daysLabel = obj.optString("days_label", "Weekdays"),
+                        activeDays = days,
+                        blockedAppIds = apps,
+                        isHardMode = obj.optBoolean("is_hard_mode", false),
+                        allowBreaks = obj.optBoolean("allow_breaks", true),
+                        isPaused = obj.optBoolean("is_paused", false),
+                        isCustom = obj.optBoolean("is_custom", false)
+                    )
+                }
+                activeRulePackages(rules, nowMillis)
+            } catch (_: Exception) {
+                emptySet()
+            }
+        }
+
+        /** Pure evaluator: safe to unit-test without Android framework JSON or services. */
+        internal fun activeRulePackages(rules: List<BlockRule>, nowMillis: Long): Set<String> {
             val now = Calendar.getInstance().apply { timeInMillis = nowMillis }
             val minute = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
             val today = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7 // 0=Monday ... 6=Sunday
             val yesterday = (today + 6) % 7
             val blocked = mutableSetOf<String>()
-            return try {
-                val rules = JSONArray(json)
-                for (i in 0 until rules.length()) {
-                    val rule = rules.getJSONObject(i)
-                    if (rule.optBoolean("is_paused", false)) continue
-                    val apps = rule.optJSONArray("blocked_apps") ?: continue
-                    if (apps.length() == 0) continue
-                    val dayArray = rule.optJSONArray("active_days")
-                    val days = if (dayArray == null) setOf(0, 1, 2, 3, 4)
-                    else (0 until dayArray.length()).mapNotNull { dayArray.optInt(it, -1).takeIf { d -> d in 0..6 } }.toSet()
-                    if (days.isEmpty()) continue
-                    val start = parseRuleTime(rule.optString("from_time", "9:00 am")) ?: continue
-                    val end = parseRuleTime(rule.optString("to_time", "5:00 pm")) ?: continue
-                    val active = if (end > start) {
-                        today in days && minute in start until end
-                    } else {
-                        (today in days && minute >= start) || (minute < end && yesterday in days)
-                    }
-                    if (active) for (appIndex in 0 until apps.length()) {
-                        apps.optString(appIndex).takeIf { it.isNotBlank() }?.let(blocked::add)
-                    }
+            for (rule in rules) {
+                if (rule.isPaused || rule.blockedAppIds.isEmpty()) continue
+                val days = rule.activeDays.filter { it in 0..6 }.toSet()
+                if (days.isEmpty()) continue
+                val start = parseRuleTime(rule.fromTime) ?: continue
+                val end = parseRuleTime(rule.toTime) ?: continue
+                val active = if (end > start) {
+                    today in days && minute in start until end
+                } else {
+                    (today in days && minute >= start) || (minute < end && yesterday in days)
                 }
-                blocked
-            } catch (_: Exception) {
-                emptySet()
+                if (active) blocked.addAll(rule.blockedAppIds.filter { it.isNotBlank() })
             }
+            return blocked
         }
 
         private fun parseRuleTime(value: String): Int? {
