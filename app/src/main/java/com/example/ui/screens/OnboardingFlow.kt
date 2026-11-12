@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.model.OnboardingStep
+import com.example.model.OnboardingInputValidator
 import com.example.ui.components.AppIconBadge
 import com.example.ui.theme.OpalBlack
 import com.example.ui.theme.OpalCardBg
@@ -300,8 +301,8 @@ private fun NameInputStep(
     onBack: () -> Unit
 ) {
     var nameText by remember(currentName) { mutableStateOf(currentName) }
-    val normalizedName = nameText.trim().replace(Regex("\\s+"), " ")
-    val isNameValid = normalizedName.length in 2..30
+    val normalizedName = OnboardingInputValidator.normalizeName(nameText)
+    val isNameValid = OnboardingInputValidator.isValidName(normalizedName)
 
     Column(
         modifier = Modifier
