@@ -300,7 +300,7 @@ object AlarmSoundManager {
 
         var audioTrack: AudioTrack? = null
         try {
-            audioTrack = AudioTrack.Builder()
+            val track = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -317,10 +317,11 @@ object AlarmSoundManager {
                 .setBufferSizeInBytes(audioData.size * 2)
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
+            audioTrack = track
 
-            val written = audioTrack.write(audioData, 0, audioData.size)
+            val written = track.write(audioData, 0, audioData.size)
             if (written > 0) {
-                audioTrack.play()
+                track.play()
                 Thread.sleep((noteDuration * notes.size * 1000).toLong() + 200)
             }
         } catch (_: Throwable) {
