@@ -196,7 +196,6 @@ private fun WelcomeRockStep(onNext: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF000000))
-            .clickable { onNext() }
             .testTag("onboarding_welcome_step"),
         contentAlignment = Alignment.Center
     ) {
@@ -282,7 +281,7 @@ private fun WelcomeRockStep(onNext: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "TAP ANYWHERE TO CONTINUE",
+                    text = "YOUR JOURNEY STARTS HERE",
                     color = Color(0xFF75757A),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -300,7 +299,9 @@ private fun NameInputStep(
     onNext: () -> Unit,
     onBack: () -> Unit
 ) {
-    var nameText by remember { mutableStateOf(currentName) }
+    var nameText by remember(currentName) { mutableStateOf(currentName) }
+    val normalizedName = nameText.trim().replace(Regex("\\s+"), " ")
+    val isNameValid = normalizedName.length in 2..30
 
     Column(
         modifier = Modifier
@@ -343,8 +344,9 @@ private fun NameInputStep(
         OutlinedTextField(
             value = nameText,
             onValueChange = {
-                nameText = it
-                onNameChanged(it)
+                val safeValue = it.filter { char -> char.isLetter() || char.isWhitespace() || char == '-' || char.code == 39 || char == '.' }.take(30)
+                nameText = safeValue
+                onNameChanged(safeValue)
             },
             placeholder = { Text("John", color = OpalTextSecondary) },
             singleLine = true,
@@ -362,13 +364,30 @@ private fun NameInputStep(
                 .testTag("onboarding_name_input")
         )
 
+        if (nameText.isNotBlank() && !isNameValid) {
+            Text(
+                text = "Enter a name between 2 and 30 characters.",
+                color = Color(0xFFFF5B66),
+                fontSize = 12.sp,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            )
+        }
+
         Spacer(modifier = Modifier.weight(1f))
 
         Button(
-            onClick = onNext,
+            onClick = {
+                if (isNameValid) {
+                    onNameChanged(normalizedName)
+                    onNext()
+                }
+            },
+            enabled = isNameValid,
             colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF35393F),
-                contentColor = Color.White
+                containerColor = Color(0xFF00E59A),
+                contentColor = Color.Black,
+                disabledContainerColor = Color(0xFF242424),
+                disabledContentColor = Color(0xFF777777)
             ),
             shape = RoundedCornerShape(28.dp),
             modifier = Modifier
@@ -1213,7 +1232,7 @@ private fun NotificationsPromptStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xFF22262B))
+                .background(OpalCardBg)
                 .border(1.dp, OpalCardBorder, RoundedCornerShape(28.dp))
                 .padding(28.dp),
             contentAlignment = Alignment.Center
@@ -1222,7 +1241,7 @@ private fun NotificationsPromptStep(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = null,
-                    tint = Color(0xFF4285F4),
+                    tint = OpalMint,
                     modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1469,7 +1488,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "$userName,\nPrime will get you back",
+                text = "$userName,\nyour next chapter starts now.",
                 color = OpalTextPrimary,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
@@ -1477,7 +1496,7 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "7 years of your life",
+                text = "Become your prime.",
                 color = OpalMintLight,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold
@@ -1488,13 +1507,13 @@ private fun FinalFistBumpStep(userName: String, onComplete: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
                 BenefitItem(
                     icon = Icons.Default.Security,
-                    title = "30% less screen time",
-                    desc = "Reduce your screen time by 30%, to 4h 54m each day"
+                    title = "More intentional screen time",
+                    desc = "Build healthier screen habits with clear, personal goals."
                 )
                 BenefitItem(
                     icon = Icons.Default.Schedule,
-                    title = "20% productivity boost",
-                    desc = "Reduce distractions during work hours by over 20%"
+                    title = "Protected focus sessions",
+                    desc = "Create focus windows and keep distracting apps out of reach."
                 )
                 BenefitItem(
                     icon = Icons.Default.CalendarToday,
