@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -326,6 +327,7 @@ fun OpalApp() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(innerPadding)
                     .background(OpalBlack)
             ) {
                 // Tab Content
@@ -333,7 +335,7 @@ fun OpalApp() {
                     NavigationTab.HOME -> {
                         HomeScreen(
                             uiState = uiState,
-                            onProfileClick = { viewModel.openSettings() },
+                            onProfileClick = { viewModel.selectTab(NavigationTab.PROFILE) },
                             onNavigateToMyApps = { viewModel.selectTab(NavigationTab.MY_APPS) },
                             onOpenDigitalWellbeing = { viewModel.openDigitalWellbeing() },
                             onRequestUsagePermission = {
@@ -378,6 +380,31 @@ fun OpalApp() {
                             onOpenPomodoro = { viewModel.openTimerTool(TimerToolSubscreen.POMODORO) },
                             onOpenStopwatch = { viewModel.openTimerTool(TimerToolSubscreen.STOPWATCH) },
                             onOpenAlarm = { viewModel.openTimerTool(TimerToolSubscreen.ALARM) }
+                        )
+                    }
+                    NavigationTab.INSIGHTS -> {
+                        DigitalWellbeingDashboard(
+                            totalScreenTime = uiState.profile.screenTimeToday,
+                            totalScreenTimeMillis = uiState.profile.screenTimeMillis,
+                            categories = uiState.todayCategoryUsage,
+                            topApps = uiState.todayAppUsage,
+                            hasUsagePermission = uiState.screenTimePermissionGranted,
+                            errorMessage = uiState.wellbeingError,
+                            onBackClick = { viewModel.selectTab(NavigationTab.HOME) },
+                            onRequestPermission = { PermissionHelper.requestUsageAccessPermission(context) },
+                            onRetryFetch = { viewModel.refreshWellbeingData() },
+                            onOpenDailyDashboard = { viewModel.openDailyDashboard() },
+                            onOpenWeeklyReport = { viewModel.openWeeklyReport() },
+                            onAppClick = { viewModel.openAppSpecificReport(it) }
+                        )
+                    }
+                    NavigationTab.PROFILE -> {
+                        SettingsScreen(
+                            profile = uiState.profile,
+                            onBackClick = { viewModel.selectTab(NavigationTab.HOME) },
+                            onTryProClick = { viewModel.upgradeToPro() },
+                            onUseEmergencyPass = { viewModel.useEmergencyPass() },
+                            onReplayOnboarding = { viewModel.startOnboarding() }
                         )
                     }
                 }
