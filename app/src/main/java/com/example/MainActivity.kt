@@ -301,14 +301,27 @@ fun OpalApp() {
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = OpalBlack,
             bottomBar = {
-                if (!uiState.isSettingsOpen &&
+                if (!uiState.isOnboarding &&
+                    !uiState.isSettingsOpen &&
                     !uiState.isAchievementDashboardOpen &&
                     !uiState.isWebsiteBlockerDashboardOpen &&
                     !uiState.isWebsiteSelectionScreenOpen &&
                     !uiState.isCustomBlocklistScreenOpen &&
                     !uiState.isBlockingScheduleScreenOpen &&
                     !uiState.isBlockingAnalyticsScreenOpen &&
+                    !uiState.isCreatingRule &&
                     uiState.editingRule == null &&
+                    uiState.viewingRuleDetail == null &&
+                    !uiState.isTargetSettingsOpen &&
+                    !uiState.isScoreFormulaOpen &&
+                    uiState.selectedBadgeForDetail == null &&
+                    !uiState.isReauthDialogOpen &&
+                    uiState.activeCategorySheet == null &&
+                    !uiState.isTimerBlockAppsSheetOpen &&
+                    !uiState.isSelectAppsSheetOpen &&
+                    uiState.selectedTimerPreset == null &&
+                    !uiState.isRingtonePickerOpen &&
+                    !uiState.isPomodoroSettingsOpen &&
                     !uiState.isDigitalWellbeingOpen &&
                     !uiState.isDailyDashboardOpen &&
                     !uiState.isWeeklyReportOpen &&
