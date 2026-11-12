@@ -325,7 +325,7 @@ fun WebsiteSelectionScreen(
                         }
 
                         Switch(
-                            checked = domainItem.isEnabled,
+                            checked = domainItem.isEnabled && (domainItem.expiresAtMillis == 0L || domainItem.expiresAtMillis > System.currentTimeMillis()),
                             onCheckedChange = { onToggleDomainEnabled(domainItem.domain, it) },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.Black,
