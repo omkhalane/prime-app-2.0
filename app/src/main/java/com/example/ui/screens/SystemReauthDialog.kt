@@ -31,7 +31,6 @@ import com.example.ui.theme.OpalTextSecondary
 @Composable
 fun SystemReauthDialog(
     onDismiss: () -> Unit,
-    onSuccess: () -> Unit,
     onLaunchSystemPrompt: (() -> Unit)? = null,
     isSystemLockAvailable: Boolean = true
 ) {
