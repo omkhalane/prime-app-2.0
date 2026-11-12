@@ -37,8 +37,11 @@ interface BlockedWebsiteDao {
     @Query("UPDATE blocked_domains SET isFavorite = :isFavorite WHERE domain = :domain")
     suspend fun updateDomainFavorite(domain: String, isFavorite: Boolean)
 
-    @Query("UPDATE blocked_domains SET isPermanent = :isPermanent, expiresAtMillis = CASE WHEN :isPermanent = 1 THEN 0 WHEN expiresAtMillis = 0 THEN :renewedUntil ELSE expiresAtMillis END WHERE domain = :domain")
-    suspend fun updateDomainPermanent(domain: String, isPermanent: Boolean, renewedUntil: Long)
+    @Query("UPDATE blocked_domains SET isPermanent = 1, previousExpiryMillis = expiresAtMillis WHERE domain = :domain AND isPermanent = 0")
+    suspend fun markDomainPermanent(domain: String)
+
+    @Query("UPDATE blocked_domains SET isPermanent = 0, expiresAtMillis = CASE WHEN previousExpiryMillis IS NOT NULL THEN previousExpiryMillis WHEN isCustom = 1 AND expiresAtMillis = 0 THEN :renewedUntil ELSE expiresAtMillis END, previousExpiryMillis = NULL WHERE domain = :domain")
+    suspend fun clearDomainPermanent(domain: String, renewedUntil: Long)
 
     @Query("SELECT COUNT(*) FROM blocked_domains")
     suspend fun getDomainCount(): Int
