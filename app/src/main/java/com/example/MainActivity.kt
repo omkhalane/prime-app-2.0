@@ -730,6 +730,7 @@ fun OpalApp() {
                         },
                         onToggleCategory = { catId, enabled ->
                             viewModel.toggleWebsiteCategory(catId, enabled)
+                            if (catId == "Entertainment") viewModel.toggleWebsiteCategory("Video Streaming", enabled)
                         },
                         onOpenCategorySelection = { viewModel.openWebsiteSelectionScreen() },
                         onOpenCustomBlocklist = { viewModel.openCustomBlocklistScreen() },
@@ -747,7 +748,10 @@ fun OpalApp() {
                         onToggleDomainEnabled = { domain, enabled ->
                             val item = uiState.blockedDomainsList.firstOrNull { it.domain == domain }
                             if (item?.isPermanent == true && !enabled) {
-                                requestDeviceReauth { viewModel.toggleWebsiteDomain(domain, false) }
+                                requestDeviceReauth {
+                                    viewModel.toggleWebsitePermanent(domain, false)
+                                    viewModel.toggleWebsiteDomain(domain, false)
+                                }
                             } else {
                                 viewModel.toggleWebsiteDomain(domain, enabled)
                             }
