@@ -66,9 +66,9 @@ fun WebsiteBlockerDashboard(
     ) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            PrimeGlassIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onBackClick, 40.dp, 20.dp)
+            PrimeGlassIconButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", onClick = onBackClick, containerSize = 40.dp, iconSize = 20.dp)
             Text("WEBSITE BLOCKER", color = PrimeTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-            PrimeGlassIconButton(Icons.Rounded.BarChart, "Analytics", onOpenAnalytics, 40.dp, 20.dp)
+            PrimeGlassIconButton(icon = Icons.Rounded.BarChart, contentDescription = "Analytics", onClick = onOpenAnalytics, containerSize = 40.dp, iconSize = 20.dp)
         }
         Spacer(Modifier.height(22.dp))
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(PrimeGlassCardBg).padding(18.dp)) {
