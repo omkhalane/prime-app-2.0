@@ -47,8 +47,6 @@ object DomainMatcher {
             cleaned = cleaned.removePrefix("www.")
         }
         cleaned = cleaned.removeSuffix(".")
-
-        cleaned = cleaned.removeSuffix(".")
         return try {
             IDN.toASCII(cleaned, IDN.USE_STD3_ASCII_RULES).lowercase(Locale.ROOT)
         } catch (_: IllegalArgumentException) {
