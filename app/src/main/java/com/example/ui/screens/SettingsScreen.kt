@@ -114,8 +114,8 @@ fun SettingsScreen(
             Text(
                 text = "Settings",
                 color = OpalTextPrimary,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.SemiBold,
                 letterSpacing = (-0.4).sp
             )
         }
@@ -216,19 +216,19 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.AutoAwesome,
                 title = "Autofocus",
-                subtitle = "Automatically trigger focus blocks"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
                 icon = Icons.Default.Shield,
                 title = "Block screens",
-                subtitle = "Personalize your block screens"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
                 icon = Icons.Default.HourglassTop,
                 title = "Waiting room",
-                subtitle = "Customize your waiting room timer"
+                subtitle = "Coming soon"
             )
         }
 
@@ -240,7 +240,7 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.HelpOutline,
                 title = "Help centre",
-                subtitle = "Guides and answers"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             Row(
@@ -267,7 +267,7 @@ fun SettingsScreen(
                     )
                 }
                 Text(
-                    text = "${profile.emergencyPassesRemaining} left (tap to test)",
+                    text = "${profile.emergencyPassesRemaining} remaining",
                     color = OpalMint,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
@@ -355,7 +355,7 @@ fun SettingsScreen(
             SettingsItemRow(
                 icon = Icons.Default.ToggleOn,
                 title = "Permissions",
-                subtitle = "Display over other apps, Screen time"
+                subtitle = "Coming soon"
             )
             HorizontalDivider(color = Color(0xFF23272C))
             SettingsItemRow(
@@ -388,7 +388,7 @@ fun SettingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Community forum",
+                    text = "Community forum · Coming soon",
                     color = OpalTextPrimary,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium
