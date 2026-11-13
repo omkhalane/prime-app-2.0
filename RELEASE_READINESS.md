@@ -16,6 +16,7 @@ This file separates repository work from release tasks that require owner creden
 - [ ] Choose and confirm the permanent Android `applicationId`. The current `com.aistudio.applet.rfrquv` is a generated placeholder and must not be published as PRIME's final identity.
 - [ ] Align the Gradle namespace and Kotlin package names with the approved identity in a dedicated migration.
 - [ ] Create and securely back up the Play upload keystore. Configure `KEYSTORE_PATH`, `STORE_PASSWORD`, and `KEY_PASSWORD` in the release environment; never commit the keystore or passwords.
+- [ ] For automated GitHub APK releases, configure the repository Actions secrets `UPLOAD_KEYSTORE_BASE64`, `STORE_PASSWORD`, and `KEY_PASSWORD`. The `.github/workflows/android-release.yml` workflow runs on `v*` tags, verifies the signed APK, and attaches it to a GitHub Release. It deliberately blocks publishing while the generated placeholder application ID remains.
 - [ ] Set the production version code/name for the first Play release and define the versioning policy for future updates.
 - [ ] Generate and inspect a signed release AAB; verify its certificate and install/update behavior on a clean test device.
 
