@@ -62,6 +62,13 @@ jobs:
           echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
           chmod 600 "$RUNNER_TEMP/prime-upload-key.jks"
 
+      - name: Verify public package identity is configured
+        run: |
+          if grep -q 'applicationId = "com.aistudio.applet.rfrquv"' app/build.gradle.kts; then
+            echo "::error::Replace the generated applicationId with PRIME's approved permanent package ID before publishing a release."
+            exit 1
+          fi
+
       - name: Verify release signing configuration
         run: |
           test -s "$KEYSTORE_PATH"
@@ -74,7 +81,7 @@ jobs:
         run: |
           APK="app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          apksigner verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
           cp "$APK" "PRIME-${GITHUB_REF_NAME}.apk"
 
       - name: Publish GitHub Release with APK
