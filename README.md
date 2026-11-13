@@ -6,6 +6,21 @@ The app combines screen-time insights, app and website blocking, focus timers, P
 
 > **Project status:** Active development. This repository contains implemented application code as well as roadmap items that are not yet complete. PRIME is not yet declared ready for a public Play Store release; see [Release readiness](RELEASE_READINESS.md).
 
+## Download PRIME for Android
+
+**Get the Android APK:** [View PRIME releases and download the latest APK](https://github.com/omkhalane/prime-app-2.0/releases/latest).
+
+Each published release includes its version, release notes, and downloadable APK under **Assets**. If no release is published yet, check the [all releases page](https://github.com/omkhalane/prime-app-2.0/releases) again later.
+
+### Install from GitHub Releases
+
+1. Open the [latest PRIME release](https://github.com/omkhalane/prime-app-2.0/releases/latest).
+2. Expand **Assets** and download the file named `PRIME-<version>.apk`.
+3. Open the downloaded APK on your Android device and approve installation from that source if Android asks.
+4. Launch PRIME and grant optional Android special access only when you enable the related feature.
+
+> **Beta notice:** PRIME is under active development. Device compatibility and feature availability can vary. Review the release notes and known limitations before installing. A GitHub APK is not a Google Play Store release.
+
 ---
 
 ## Contents
