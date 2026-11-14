@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -77,6 +78,7 @@ fun HomeScreen(
     onBadgeClick: (PrimeBadge) -> Unit = {},
     onClaimQuest: (String) -> Unit = {},
     onOpenWebsiteBlocker: () -> Unit = {},
+    onOpenFocus: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -108,6 +110,24 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(6.dp))
+
+                // PRIME editorial welcome: clear hierarchy, restrained emerald glow and
+                // real profile data. No demo metrics or hard-coded activity are introduced.
+                PrimeHomeWelcome(
+                    name = uiState.profile.name,
+                    streakDays = uiState.profile.streakDays
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                PrimeHomeQuickActions(
+                    onFocus = onOpenFocus,
+                    onShields = onNavigateToMyApps,
+                    onInsights = onOpenDigitalWellbeing,
+                    onAchievements = onOpenAchievementDashboard
+                )
+
+                Spacer(modifier = Modifier.height(22.dp))
 
                 // Dynamic User Rank Badge Hero based on score & ranking tier
                 PrimeCurrentRankHeroBadge(
@@ -445,5 +465,193 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+
+@Composable
+private fun PrimeHomeWelcome(
+    name: String,
+    streakDays: Int
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(26.dp))
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(Color(0xFF06251B), Color(0xFF101714), Color(0xFF080B09))
+                )
+            )
+            .border(
+                BorderStroke(1.dp, PrimeAccent.copy(alpha = 0.24f)),
+                RoundedCornerShape(26.dp)
+            )
+            .padding(horizontal = 20.dp, vertical = 20.dp)
+    ) {
+        Text(
+            text = "YOUR SPACE. YOUR PACE.",
+            color = PrimeAccent,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 2.sp
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "Welcome back, ${name.trim().ifBlank { "there" }}.",
+            color = PrimeTextPrimary,
+            fontSize = 25.sp,
+            lineHeight = 31.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Make today count. One focused moment at a time.",
+            color = PrimeTextSecondary,
+            fontSize = 13.sp,
+            lineHeight = 19.sp
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(PrimeAccent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = PrimeAccent,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+            Spacer(Modifier.width(9.dp))
+            Text(
+                text = if (streakDays > 0) "$streakDays day focus streak" else "Your next streak starts today",
+                color = PrimeTextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrimeHomeQuickActions(
+    onFocus: () -> Unit,
+    onShields: () -> Unit,
+    onInsights: () -> Unit,
+    onAchievements: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "QUICK ACCESS",
+                color = PrimeTextTertiary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.8.sp
+            )
+            Text(
+                text = "Your tools",
+                color = PrimeTextSecondary,
+                fontSize = 11.sp
+            )
+        }
+        Spacer(Modifier.height(11.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PrimeQuickActionTile(
+                title = "Focus",
+                subtitle = "Start a session",
+                icon = Icons.Rounded.CheckCircle,
+                modifier = Modifier.weight(1f),
+                onClick = onFocus
+            )
+            PrimeQuickActionTile(
+                title = "Shields",
+                subtitle = "Manage blocks",
+                icon = Icons.Rounded.Shield,
+                modifier = Modifier.weight(1f),
+                onClick = onShields
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            PrimeQuickActionTile(
+                title = "Insights",
+                subtitle = "Screen time",
+                icon = Icons.Rounded.Lock,
+                modifier = Modifier.weight(1f),
+                onClick = onInsights
+            )
+            PrimeQuickActionTile(
+                title = "Progress",
+                subtitle = "Achievements",
+                icon = Icons.Rounded.EmojiEvents,
+                modifier = Modifier.weight(1f),
+                onClick = onAchievements
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrimeQuickActionTile(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(19.dp))
+            .background(Color(0xFF101311))
+            .border(
+                BorderStroke(1.dp, Color(0xFF26332D)),
+                RoundedCornerShape(19.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+            .testTag("home_quick_action_${title.lowercase()}"),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(PrimeAccent.copy(alpha = 0.13f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = PrimeAccent,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        Text(
+            text = title,
+            color = PrimeTextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = subtitle,
+            color = PrimeTextTertiary,
+            fontSize = 11.sp
+        )
     }
 }
