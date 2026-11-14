@@ -364,7 +364,8 @@ fun OpalApp() {
                             onOpenFormulaDialog = { viewModel.openScoreFormula() },
                             onBadgeClick = { badge -> viewModel.selectBadgeForDetail(badge) },
                             onClaimQuest = { questId -> viewModel.claimDailyQuest(questId) },
-                            onOpenWebsiteBlocker = { viewModel.openWebsiteBlockerDashboard() }
+                            onOpenWebsiteBlocker = { viewModel.openWebsiteBlockerDashboard() },
+                            onOpenFocus = { viewModel.selectTab(NavigationTab.TIMER) }
                         )
                     }
                     NavigationTab.MY_APPS -> {
